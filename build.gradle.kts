@@ -25,7 +25,7 @@ runPaper {
 tasks {
     runServer {
         pluginJars(fileTree("plugins"))
-        pluginJars(project(":plugin:paper").tasks.shadowJar.flatMap {
+        pluginJars(project(":platform:paper").tasks.shadowJar.flatMap {
             it.archiveFile
         })
         pluginJars(project(":test-plugin").tasks.jar.flatMap {
@@ -33,9 +33,9 @@ tasks {
         })
         version(minecraft)
         downloadPlugins {
-            hangar("ViaVersion", "5.7.0")
-            hangar("ViaBackwards", "5.7.0")
-            hangar("Skript", "2.13.2")
+            hangar("ViaVersion", "5.7.1")
+            hangar("ViaBackwards", "5.7.1")
+            hangar("Skript", "2.14.1")
             hangar("TabTPS", "1.3.30")
         }
     }
@@ -64,7 +64,7 @@ hangarPublish {
         }
         platforms {
             register(Platforms.PAPER) {
-                jar = project(":plugin:paper").tasks.shadowJar.flatMap {
+                jar = project(":platform:paper").tasks.shadowJar.flatMap {
                     it.archiveFile
                 }
                 platformVersions = SUPPORTED_VERSIONS

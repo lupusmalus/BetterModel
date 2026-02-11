@@ -6,8 +6,9 @@
  */
 package kr.toxicity.model.api.config;
 
-import org.bukkit.configuration.ConfigurationSection;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.function.Predicate;
 
 /**
  * Module config
@@ -15,26 +16,26 @@ import org.jetbrains.annotations.NotNull;
  * @param playerAnimation create player animation
  */
 public record ModuleConfig(
-        boolean model,
-        boolean playerAnimation
+    boolean model,
+    boolean playerAnimation
 ) {
     /**
      * Default config
      */
     public static final ModuleConfig DEFAULT = new ModuleConfig(
-            true,
-            true
+        true,
+        true
     );
 
     /**
      * Creates config from YAML
-     * @param section yaml
+     * @param predicate predicate
      * @return config
      */
-    public static @NotNull ModuleConfig from(@NotNull ConfigurationSection section) {
+    public static @NotNull ModuleConfig from(@NotNull Predicate<String> predicate) {
         return new ModuleConfig(
-                section.getBoolean("model"),
-                section.getBoolean("player-animation")
+            predicate.test("model"),
+            predicate.test("player-animation")
         );
     }
 }

@@ -9,43 +9,31 @@ package kr.toxicity.model.api.event;
 import kr.toxicity.model.api.profile.ModelProfile;
 import lombok.Getter;
 import lombok.Setter;
-import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Create player skin data event
+ * Triggered when a player's skin data is created or loaded.
+ * <p>
+ * This event allows modifying the player's model profile before it is used.
+ * </p>
+ *
+ * @since 2.0.0
  */
 @Getter
 @Setter
-public final class CreatePlayerSkinEvent extends AbstractModelEvent {
-    /**
-     * Handler list
-     */
-    public static final HandlerList HANDLER_LIST = new HandlerList();
+public final class CreatePlayerSkinEvent implements ModelEvent {
 
     private ModelProfile modelProfile;
 
     /**
-     * Creates event
-     * @param modelProfile model skin
+     * Creates a new CreatePlayerSkinEvent.
+     *
+     * @param modelProfile the model profile being created
+     * @since 2.0.0
      */
     @ApiStatus.Internal
     public CreatePlayerSkinEvent(@NotNull ModelProfile modelProfile) {
         this.modelProfile = modelProfile;
-    }
-
-    @Override
-    public @NotNull HandlerList getHandlers() {
-        return HANDLER_LIST;
-    }
-
-    /**
-     * Gets a handler list
-     * @return handler list
-     */
-    @SuppressWarnings("unused") //This method is necessary for event API.
-    public static @NotNull HandlerList getHandlerList() {
-        return HANDLER_LIST;
     }
 }

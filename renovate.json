@@ -1,13 +1,18 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ],
-  "ignoreDeps": [
-    "org.jetbrains:annotations",
-    "org.incendo:cloud-paper"
-  ],
-  "baseBranches": [
-    "dev"
-  ]
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:recommended"
+    ],
+    "ignoreDeps": [
+        "org.jetbrains:annotations",
+        "org.incendo:cloud-paper",
+        "org.incendo:cloud-fabric",
+        "io.papermc.parchment.data:parchment",
+        "net.fabricmc.fabric-api:fabric-api",
+        "fabric-loom",
+        "eu.pb4:polymer-resource-pack"
+    ],
+    "baseBranches": [
+        "v2-dev"
+    ]
 }

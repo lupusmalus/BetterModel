@@ -8,9 +8,8 @@ package kr.toxicity.model.api.data.raw;
 
 import kr.toxicity.model.api.BetterModel;
 import kr.toxicity.model.api.animation.AnimationIterator;
-import kr.toxicity.model.api.animation.AnimationMovement;
+import kr.toxicity.model.api.animation.AnimationProgress;
 import kr.toxicity.model.api.animation.VectorPoint;
-import kr.toxicity.model.api.bone.BoneTagRegistry;
 import kr.toxicity.model.api.data.blueprint.AnimationGenerator;
 import kr.toxicity.model.api.data.blueprint.BlueprintAnimation;
 import kr.toxicity.model.api.data.blueprint.BlueprintAnimator;
@@ -69,7 +68,7 @@ public record ModelAnimation(
                 .map(Map.Entry::getValue)
                 .filter(ModelAnimator::isAvailable)
                 .map(a -> buildAnimationData(context, a)),
-            data -> BoneTagRegistry.parse(data.name())
+            BlueprintAnimator.AnimatorData::name
         ));
         return new BlueprintAnimation(
             name(),
@@ -81,13 +80,11 @@ public record ModelAnimation(
                 .filter(ModelAnimator::isNotEmpty)
                 .map(a -> toScript(a, context.placeholder))
                 .orElseGet(() -> BlueprintScript.fromEmpty(this)),
-            animators.isEmpty() ? AnimationMovement.withEmpty(length()) : animators.values()
+            animators.isEmpty() ? AnimationProgress.emptyStorage(length()) : animators.values()
                 .iterator()
                 .next()
                 .keyframe()
-                .stream()
-                .map(AnimationMovement::empty)
-                .toList()
+                .toEmpty()
         );
     }
 
@@ -95,7 +92,7 @@ public record ModelAnimation(
         var get = animator.stream()
             .filter(f -> f.point().hasScript())
             .map(d -> AnimationScript.of(Arrays.stream(placeholder.parseVariable(d.point().script()).split("\n"))
-                .map(BetterModel.plugin().scriptManager()::build)
+                .map(BetterModel.platform().scriptManager()::build)
                 .filter(Objects::nonNull)
                 .toList()
             ).time(d.time()))

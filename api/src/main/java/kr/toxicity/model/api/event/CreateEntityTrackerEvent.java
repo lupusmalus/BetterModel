@@ -6,38 +6,19 @@
  */
 package kr.toxicity.model.api.event;
 
-import kr.toxicity.model.api.entity.BaseEntity;
 import kr.toxicity.model.api.tracker.EntityTracker;
-import lombok.Getter;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Create event of entity tracker
+ * Triggered when a new {@link EntityTracker} is created.
+ * <p>
+ * This event allows plugins/mods to perform initialization or tracking logic for entity trackers.
+ * </p>
+ *
+ * @param tracker the newly created entity tracker
+ * @since 2.0.0
  */
-@Getter
-public final class CreateEntityTrackerEvent extends CreateTrackerEvent {
-
-    /**
-     * Creates event
-     * @param tracker tracker
-     */
-    @ApiStatus.Internal
-    public CreateEntityTrackerEvent(@NotNull EntityTracker tracker) {
-        super(tracker);
-    }
-
-    @NotNull
-    public EntityTracker tracker() {
-        return (EntityTracker) super.tracker();
-    }
-
-    /**
-     * Gets source entity
-     * @return source entity
-     */
-    @NotNull
-    public BaseEntity sourceEntity() {
-        return tracker().sourceEntity();
-    }
+public record CreateEntityTrackerEvent(
+    @NotNull EntityTracker tracker
+) implements ModelEvent {
 }

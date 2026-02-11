@@ -12,9 +12,14 @@ import kr.toxicity.model.api.BetterModel;
 import kr.toxicity.model.api.animation.AnimationEventHandler;
 import kr.toxicity.model.api.animation.AnimationModifier;
 import kr.toxicity.model.api.bone.RenderedBone;
+import kr.toxicity.model.api.bukkit.BetterModelBukkit;
+import kr.toxicity.model.api.bukkit.platform.BukkitAdapter;
+import kr.toxicity.model.api.data.ModelAsset;
+import kr.toxicity.model.api.data.renderer.ModelRenderer;
+import kr.toxicity.model.api.event.ModelAssetsEvent;
 import kr.toxicity.model.api.event.PluginStartReloadEvent;
 import kr.toxicity.model.api.pack.PackNamespace;
-import kr.toxicity.model.api.util.LogUtil;
+import kr.toxicity.model.api.platform.PlatformPlayer;
 import lombok.RequiredArgsConstructor;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.*;
@@ -26,15 +31,12 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
-import java.io.BufferedOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -64,35 +66,24 @@ public final class FightTester implements ModelTester, Listener {
             if (sender instanceof Player player) giveKnightSword(player);
             return true;
         });
+        BetterModelBukkit.platform().eventBus().subscribe(test, PluginStartReloadEvent.class, event -> {
+            var path = event.zipper()
+                .modern()
+                .bettermodel();
+            loadItem(path, "knight_sword");
+            loadItem(path, "knight_line");
+        });
+        BetterModelBukkit.platform().eventBus().subscribe(test, ModelAssetsEvent.class, event -> {
+            if (event.type() == ModelRenderer.Type.PLAYER) event.addAsset(ModelAsset.of(
+                "knight",
+                () -> Objects.requireNonNull(test.getResource("knight.bbmodel"))
+            ));
+        });
     }
 
     @Override
     public void end(@NotNull BetterModelTest test) {
         HandlerList.unregisterAll(this);
-    }
-
-    @EventHandler
-    public void start(@NotNull PluginStartReloadEvent event) {
-        var path = event.getPackZipper()
-            .modern()
-            .bettermodel();
-        loadMotion();
-        loadItem(path, "knight_sword");
-        loadItem(path, "knight_line");
-    }
-
-    private void loadMotion() {
-        var dir = new File(BetterModel.plugin().getDataFolder(), "players/knight.bbmodel");
-        if (dir.isFile()) return;
-        dir.getParentFile().mkdirs();
-        try (
-            var stream = new FileOutputStream(dir);
-            var buffered = new BufferedOutputStream(stream)
-        ) {
-            buffered.write(test.asByte("knight.bbmodel").get());
-        } catch (IOException e) {
-            LogUtil.handleException("Unable to load knight.bbmodel", e);
-        }
     }
 
     private void loadItem(@NotNull PackNamespace path, @NotNull String itemName) {
@@ -129,7 +120,7 @@ public final class FightTester implements ModelTester, Listener {
             meta.displayName(MiniMessage.miniMessage().deserialize("<gradient:#FF6A00:#FFD800><b>Knight Sword"));
             meta.setUnbreakable(true);
             meta.setItemModel(new NamespacedKey(
-                BetterModel.plugin(),
+                (Plugin) BetterModel.platform(),
                 "knight_sword"
             ));
             meta.addItemFlags(ItemFlag.values());
@@ -141,7 +132,7 @@ public final class FightTester implements ModelTester, Listener {
     private static @NotNull ItemStack createLine() {
         var line = new ItemStack(Material.PAPER);
         line.editMeta(meta -> meta.setItemModel(new NamespacedKey(
-            BetterModel.plugin(),
+            (Plugin) BetterModel.platform(),
             "knight_line"
         )));
         return line;
@@ -171,7 +162,7 @@ public final class FightTester implements ModelTester, Listener {
         }
         private void execute(@NotNull String target) {
             BetterModel.limb("knight")
-                .map(limb -> limb.getOrCreate(player))
+                .map(limb -> limb.getOrCreate(BukkitAdapter.adapt(player)))
                 .ifPresent(tracker -> {
                     var drawer = tracker.bone("sword_point");
                     if (drawer == null) {
@@ -226,7 +217,7 @@ public final class FightTester implements ModelTester, Listener {
     }
 
     private class LineDrawer {
-        private final List<Player> players;
+        private final List<PlatformPlayer> players;
         private DrawerFrame after;
         private final AtomicInteger counter = new AtomicInteger();
         private final List<BooleanSupplier> queuedTask = new ArrayList<>();
@@ -234,10 +225,10 @@ public final class FightTester implements ModelTester, Listener {
 
         LineDrawer(@NotNull Player player, @NotNull RenderedBone bone, int count) {
             players = Stream.concat(
-                Stream.of(player),
-                player.getTrackedBy().stream()
+                Stream.of(BukkitAdapter.adapt(player)),
+                player.getTrackedBy().stream().map(BukkitAdapter::adapt)
             ).toList();
-            task = Bukkit.getAsyncScheduler().runAtFixedRate(BetterModel.plugin(), task -> {
+            task = Bukkit.getAsyncScheduler().runAtFixedRate((Plugin) BetterModel.platform(), task -> {
                 queuedTask.removeIf(BooleanSupplier::getAsBoolean);
                 var c = counter.incrementAndGet();
                 if (c >= count) return;
@@ -285,8 +276,8 @@ public final class FightTester implements ModelTester, Listener {
                 0,
                 new Particle.DustOptions(Color.YELLOW, 1)
             );
-            var display = BetterModel.nms().create(start, 0, d -> {
-                d.item(lineItem);
+            var display = BetterModel.nms().create(BukkitAdapter.adapt(start), 0, d -> {
+                d.item(BukkitAdapter.adapt(lineItem));
                 d.brightness(15, 15);
             });
             var transformer = display.createTransformer();

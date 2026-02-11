@@ -8,30 +8,27 @@ package kr.toxicity.model.manager
 
 import com.google.gson.JsonArray
 import kr.toxicity.model.api.bone.BoneItemMapper
-import kr.toxicity.model.api.bone.BoneTagRegistry
-import kr.toxicity.model.api.bone.BoneTags
+import kr.toxicity.model.api.data.ModelAsset
 import kr.toxicity.model.api.data.blueprint.BlueprintElement
 import kr.toxicity.model.api.data.blueprint.BlueprintJson
 import kr.toxicity.model.api.data.blueprint.ModelBlueprint
 import kr.toxicity.model.api.data.renderer.ModelRenderer
 import kr.toxicity.model.api.data.renderer.RendererGroup
+import kr.toxicity.model.api.event.ModelAssetsEvent
 import kr.toxicity.model.api.event.ModelImportedEvent
 import kr.toxicity.model.api.manager.ModelManager
 import kr.toxicity.model.api.pack.PackBuilder
 import kr.toxicity.model.api.pack.PackZipper
+import kr.toxicity.model.api.platform.PlatformNamespace
 import kr.toxicity.model.util.*
 import net.kyori.adventure.text.format.NamedTextColor.*
-import org.bukkit.NamespacedKey
-import org.bukkit.inventory.ItemStack
 import java.io.File
-import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.extension
-import kotlin.io.path.fileSize
 
 object ModelManagerImpl : ModelManager, GlobalManager {
 
-    private lateinit var itemModelNamespace: NamespacedKey
+    private lateinit var itemModelNamespace: PlatformNamespace
     private val generalModelMap = hashMapOf<String, ModelRenderer>()
     private val generalModelView = generalModelMap.toImmutableView()
     private val playerModelMap = hashMapOf<String, ModelRenderer>()
@@ -42,21 +39,24 @@ object ModelManagerImpl : ModelManager, GlobalManager {
         type: ModelRenderer.Type,
         pipeline: ReloadPipeline,
         dir: File
-    ): List<ImportedModel> {
-        val targetFolder = dir.fileTrees().use { stream ->
-            stream.filter { it.extension in modelExtensions }.toList()
-        }.ifEmpty {
-            return emptyList()
-        }
-        val modelFileMap = ConcurrentHashMap<String, Pair<Path, ModelBlueprint>>()
+    ): Sequence<ImportedModel> {
+        val targetAssets = ModelAssetsEvent(type, dir.fileTrees().use { stream ->
+            stream.filter { it.extension.lowercase() in modelExtensions }
+                .map(ModelAsset::of)
+                .toMutableSet()
+        }).apply { call() }
+            .assets
+            .ifEmpty { return emptySequence() }
+            .toList()
+        val modelFileMap = ConcurrentHashMap<String, Pair<ModelAsset, ModelBlueprint>>(targetAssets.size)
         val typeName = type.name.lowercase()
         pipeline.apply {
             status = "Importing $typeName models..."
-            goal = targetFolder.size
-        }.forEachParallel(targetFolder, Path::fileSize) {
-            val load = it.toFile().toTexturedModel() ?: return@forEachParallel
+            goal = targetAssets.size
+        }.forEachParallel(targetAssets, ModelAsset::sizeAssume) {
+            val index = pipeline.progress()
+            val load = it.toTexturedModel() ?: return@forEachParallel
             modelFileMap.compute(load.name) { _, v ->
-                val index = pipeline.progress()
                 if (v != null) {
                     // A model with the same name already exists from a different file
                     warn(
@@ -64,7 +64,7 @@ object ModelManagerImpl : ModelManager, GlobalManager {
                         "Duplicated file: $it".toComponent(RED),
                         "And: ${v.first}".toComponent(RED)
                     )
-                    return@compute v
+                    if (v.first < it) return@compute v
                 }
                 debugPack {
                     componentOf(
@@ -79,8 +79,7 @@ object ModelManagerImpl : ModelManager, GlobalManager {
         return modelFileMap.values
             .asSequence()
             .sortedBy { it.first }
-            .map { ImportedModel(it.first.fileSize(), type,it.second) }
-            .toList()
+            .map { ImportedModel(it.first.sizeAssume, type,it.second) }
     }
 
     private fun loadModels(pipeline: ReloadPipeline, zipper: PackZipper) {
@@ -94,7 +93,7 @@ object ModelManagerImpl : ModelManager, GlobalManager {
                             copyRecursively(folder, overwrite = true)
                             info("ModelEngine's models are successfully migrated.".toComponent(GREEN))
                         } ?: run {
-                        if (PLUGIN.version().useModernResource()) folder.addResource("demon_knight.bbmodel")
+                        if (PLATFORM.version().useModernResource()) folder.addResource("demon_knight.bbmodel")
                     }
                 })
             )
@@ -118,7 +117,7 @@ object ModelManagerImpl : ModelManager, GlobalManager {
     }
 
     private class ModelPipeline(
-        private val zipper: PackZipper
+        zipper: PackZipper
     ) : AutoCloseable {
 
         private var indexer = 1
@@ -129,17 +128,17 @@ object ModelManagerImpl : ModelManager, GlobalManager {
             models = zipper.legacy().bettermodel().models().resolve("item"),
             available = CONFIG.pack().generateLegacyModel,
             onBuild = { blueprints, size ->
-                val blueprint = blueprints.first()
+                val json = blueprints.first()
                 entries += jsonObjectOf(
                     "predicate" to jsonObjectOf("custom_model_data" to indexer),
-                    "model" to "${CONFIG.namespace()}:item/${blueprint.name}"
+                    "model" to "${CONFIG.namespace()}:item/${json.name}"
                 )
-                models.add("${blueprint.name}.json", size) {
-                    blueprint.element.get().toByteArray()
+                models.add(json.jsonName(), size) {
+                    json.buildJson().toByteArray()
                 }
             },
             onClose = {
-                val itemName = CONFIG.item().name.lowercase()
+                val itemName = CONFIG.itemModel().lowercase()
                 jsonObjectOf(
                     "parent" to "minecraft:item/generated",
                     "textures" to jsonObjectOf("layer0" to "minecraft:item/$itemName"),
@@ -160,8 +159,8 @@ object ModelManagerImpl : ModelManager, GlobalManager {
                     "model" to blueprints.toModernJson()
                 )
                 blueprints.forEach { json ->
-                    models.add("${json.name}.json", size / blueprints.size) {
-                        json.element.get().toByteArray()
+                    models.add(json.jsonName(), size / blueprints.size) {
+                        json.buildJson().toByteArray()
                     }
                 }
             },
@@ -186,52 +185,52 @@ object ModelManagerImpl : ModelManager, GlobalManager {
 
         fun addModelTo(
             targetMap: MutableMap<String, ModelRenderer>,
-            model: List<ImportedModel>
+            model: Sequence<ImportedModel>
         ) {
-            if (model.isEmpty()) return
-            model.forEach { importedModel ->
-                val size = importedModel.jsonSize
-                val load = importedModel.blueprint
-                val hasTexture = load.hasTexture()
-                targetMap[load.name] = load.toRenderer(importedModel.type) render@ { group ->
-                    if (!hasTexture) return@render null
-                    var success = false
-                    //Modern
+            model.forEach { addModelTo(targetMap, it) }
+        }
+
+        private fun addModelTo(
+            targetMap: MutableMap<String, ModelRenderer>,
+            importedModel: ImportedModel
+        ) {
+            val size = importedModel.jsonSize
+            val blueprint = importedModel.blueprint
+            val hasTexture = blueprint.hasTexture()
+            targetMap[blueprint.name] = blueprint.toRenderer(importedModel.type) render@ { group ->
+                if (!hasTexture) return@render null
+                listOfNotNull(
                     modernModel.ifAvailable {
-                        group.buildModernJson(obfuscator, load)
-                    }?.let {
-                        modernModel.build(it, size / it.size)
-                        success = true
-                    }
-                    //Legacy
+                        group.buildModernJson(obfuscator, blueprint)
+                            ?.let { build(it, size / it.size) }
+                    },
                     legacyModel.ifAvailable {
-                        group.buildLegacyJson(PLUGIN.version().useModernResource(), obfuscator, load)
-                    }?.let {
-                        legacyModel.build(listOf(it), size)
-                        success = true
+                        group.buildLegacyJson(PLATFORM.version().useModernResource(), obfuscator, blueprint)
+                            ?.let { build(listOf(it), size) }
                     }
-                    if (success) indexer++ else null
-                }.apply {
-                    debugPack {
-                        componentOf(
-                            "This model was successfully imported: ".toComponent(),
-                            load.name.toComponent(GREEN)
-                        )
-                    }
-                    ModelImportedEvent(load, this).call()
+                ).run {
+                    if (isNotEmpty()) indexer++ else null
                 }
-                if (hasTexture) load.buildImage(textures.obfuscator()).forEach { image ->
-                    textures.add("${image.name}.png", image.estimatedSize()) {
-                        image.toByteArray()
-                    }
-                    image.mcmeta()?.let { meta ->
-                        textures.add("${image.name}.png.mcmeta", -1) {
-                            meta.toByteArray()
-                        }
-                    }
+            }.apply {
+                debugPack {
+                    componentOf(
+                        "This model was successfully imported: ".toComponent(),
+                        blueprint.name.toComponent(GREEN)
+                    )
                 }
-                estimatedSize += size
+                callEvent { ModelImportedEvent(blueprint, this) }
             }
+            if (hasTexture) blueprint.buildImage(textures.obfuscator()).forEach { image ->
+                textures.add(image.pngName(), image.estimatedSize()) {
+                    image.toByteArray()
+                }
+                image.mcmeta()?.let { meta ->
+                    textures.add(image.mcmetaName(), -1) {
+                        meta.toByteArray()
+                    }
+                }
+            }
+            estimatedSize += size
         }
 
         inner class ModelBuilder(
@@ -280,13 +279,7 @@ object ModelManagerImpl : ModelManager, GlobalManager {
                 return RendererGroup(
                     scale(),
                     if (name.toItemMapper() !== BoneItemMapper.EMPTY) null else builder(this)?.let { i ->
-                        ItemStack(CONFIG.item()).apply {
-                            itemMeta = itemMeta.apply {
-                                @Suppress("DEPRECATION") //To support legacy server :(
-                                setCustomModelData(i)
-                                if (PLUGIN.version().useItemModelName()) itemModel = itemModelNamespace
-                            }
-                        }
+                        CONFIG.item().get().modelData(i, itemModelNamespace)
                     },
                     this,
                     children.filterIsInstance<BlueprintElement.Bone>()
@@ -305,13 +298,10 @@ object ModelManagerImpl : ModelManager, GlobalManager {
     }
 
     override fun start() {
-        BoneTags.entries.forEach {
-            BoneTagRegistry.addTag(it)
-        }
     }
 
     override fun reload(pipeline: ReloadPipeline, zipper: PackZipper) {
-        itemModelNamespace = NamespacedKey(CONFIG.namespace(), CONFIG.itemNamespace())
+        itemModelNamespace = PlatformNamespace(CONFIG.namespace(), CONFIG.itemNamespace())
         generalModelMap.clear()
         playerModelMap.clear()
         loadModels(pipeline, zipper)

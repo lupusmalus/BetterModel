@@ -6,52 +6,21 @@
  */
 package kr.toxicity.model.api.event;
 
-import org.bukkit.entity.Player;
-import org.bukkit.event.HandlerList;
-import org.jetbrains.annotations.ApiStatus;
+import kr.toxicity.model.api.platform.PlatformPlayer;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Animation signal event
+ * Triggered when an animation script emits a signal.
+ * <p>
+ * This event allows plugins/mods to react to custom signals defined within BlockBench animations.
+ * </p>
+ *
+ * @param player the player associated with the animation
+ * @param signal the signal
+ * @since 2.0.0
  */
-public final class AnimationSignalEvent extends AbstractPlayerModelEvent {
-    /**
-     * Handler list
-     */
-    public static final HandlerList HANDLER_LIST = new HandlerList();
-
-    private final String signal;
-
-    /**
-     * Creates signal event
-     * @param player player
-     * @param signal signal
-     */
-    @ApiStatus.Internal
-    public AnimationSignalEvent(@NotNull Player player, @NotNull String signal) {
-        super(player);
-        this.signal = signal;
-    }
-
-    @Override
-    public @NotNull HandlerList getHandlers() {
-        return HANDLER_LIST;
-    }
-
-    /**
-     * Gets signal
-     * @return signal
-     */
-    public @NotNull String signal() {
-        return signal;
-    }
-
-    /**
-     * Gets a handler list
-     * @return handler list
-     */
-    @SuppressWarnings("unused") //This method is necessary for event API.
-    public static @NotNull HandlerList getHandlerList() {
-        return HANDLER_LIST;
-    }
+public record AnimationSignalEvent(
+    @NotNull PlatformPlayer player,
+    @NotNull String signal
+) implements ModelEvent {
 }

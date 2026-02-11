@@ -63,7 +63,7 @@ public final class HttpUtil {
      * @return latest version
      */
     public static @NotNull LatestVersion versionList() {
-        return versionList(BetterModel.plugin().version());
+        return versionList(BetterModel.platform().version());
     }
 
     /**
@@ -158,7 +158,7 @@ public final class HttpUtil {
          * @return is same platform
          */
         public boolean isSamePlatform() {
-            return BetterModel.IS_PAPER != loaders.contains("bukkit");
+            return loaders.contains(BetterModel.platform().jarType().raw());
         }
     }
 

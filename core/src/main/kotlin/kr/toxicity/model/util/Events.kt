@@ -6,13 +6,7 @@
  */
 package kr.toxicity.model.util
 
+import kr.toxicity.model.api.event.ModelEvent
 import kr.toxicity.model.api.util.EventUtil
-import org.bukkit.Bukkit
-import org.bukkit.event.Event
-import org.bukkit.event.Listener
 
-fun registerListener(listener: Listener) {
-    Bukkit.getPluginManager().registerEvents(listener, PLUGIN)
-}
-
-fun Event.call(): Boolean = EventUtil.call(this)
+inline fun <reified T : ModelEvent> callEvent(noinline block: () -> T): Boolean = EventUtil.call(T::class.java) { block() }.triggered()

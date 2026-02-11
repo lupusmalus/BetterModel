@@ -32,28 +32,28 @@ import java.util.UUID;
  * @since 1.15.2
  */
 public record TrackerData(
-        @NotNull String id,
-        @Nullable ModelScaler scaler,
-        @Nullable ModelRotator rotator,
-        @NotNull TrackerModifier modifier,
-        @Nullable @SerializedName("body-rotator") EntityBodyRotator.RotatorData bodyRotator,
-        @Nullable @SerializedName("hide-option") EntityHideOption hideOption,
-        @Nullable @SerializedName("mark-for-spawn") Set<UUID> markForSpawn
+    @NotNull String id,
+    @Nullable ModelScaler scaler,
+    @Nullable ModelRotator rotator,
+    @NotNull TrackerModifier modifier,
+    @Nullable @SerializedName("body-rotator") EntityBodyRotator.RotatorData bodyRotator,
+    @Nullable @SerializedName("hide-option") EntityHideOption hideOption,
+    @Nullable @SerializedName("mark-for-spawn") Set<UUID> markForSpawn
 ) {
     /**
      * The GSON parser for serializing and deserializing tracker data.
      * @since 1.15.2
      */
     public static final Gson PARSER = new GsonBuilder()
-            .registerTypeAdapter(ModelScaler.class, (JsonDeserializer<ModelScaler>) (json, typeOfT, context) -> json.isJsonObject() ? ModelScaler.deserialize(json.getAsJsonObject()) : ModelScaler.defaultScaler())
-            .registerTypeAdapter(ModelScaler.class, (JsonSerializer<ModelScaler>) (src, typeOfSrc, context) -> src.serialize())
-            .registerTypeAdapter(ModelRotator.class, (JsonDeserializer<ModelRotator>) (json, typeOfT, context) -> json.isJsonObject() ? ModelRotator.deserialize(json.getAsJsonObject()) : ModelRotator.YAW)
-            .registerTypeAdapter(ModelRotator.class, (JsonSerializer<ModelRotator>) (src, typeOfSrc, context) -> src.serialize())
-            .registerTypeAdapter(EntityHideOption.class, (JsonDeserializer<EntityHideOption>) (json, typeOfT, context) -> json.isJsonArray() ? EntityHideOption.deserialize(json.getAsJsonArray()) : EntityHideOption.DEFAULT)
-            .registerTypeAdapter(EntityHideOption.class, (JsonSerializer<EntityHideOption>) (src, typeOfSrc, context) -> src.serialize())
-            .registerTypeAdapter(UUID.class, (JsonDeserializer<UUID>) (json, typeOfT, context) -> UUID.fromString(json.getAsString()))
-            .registerTypeAdapter(UUID.class, (JsonSerializer<UUID>) (src, typeOfSrc, context) -> new JsonPrimitive(src.toString()))
-            .create();
+        .registerTypeAdapter(ModelScaler.class, (JsonDeserializer<ModelScaler>) (json, typeOfT, context) -> json.isJsonObject() ? ModelScaler.deserialize(json.getAsJsonObject()) : ModelScaler.defaultScaler())
+        .registerTypeAdapter(ModelScaler.class, (JsonSerializer<ModelScaler>) (src, typeOfSrc, context) -> src.serialize())
+        .registerTypeAdapter(ModelRotator.class, (JsonDeserializer<ModelRotator>) (json, typeOfT, context) -> json.isJsonObject() ? ModelRotator.deserialize(json.getAsJsonObject()) : ModelRotator.YAW)
+        .registerTypeAdapter(ModelRotator.class, (JsonSerializer<ModelRotator>) (src, typeOfSrc, context) -> src.serialize())
+        .registerTypeAdapter(EntityHideOption.class, (JsonDeserializer<EntityHideOption>) (json, typeOfT, context) -> json.isJsonArray() ? EntityHideOption.deserialize(json.getAsJsonArray()) : EntityHideOption.DEFAULT)
+        .registerTypeAdapter(EntityHideOption.class, (JsonSerializer<EntityHideOption>) (src, typeOfSrc, context) -> src.serialize())
+        .registerTypeAdapter(UUID.class, (JsonDeserializer<UUID>) (json, typeOfT, context) -> UUID.fromString(json.getAsString()))
+        .registerTypeAdapter(UUID.class, (JsonSerializer<UUID>) (src, typeOfSrc, context) -> new JsonPrimitive(src.toString()))
+        .create();
 
     /**
      * Applies this data to an existing entity tracker.
@@ -88,41 +88,77 @@ public record TrackerData(
      */
     public static @NotNull TrackerData deserialize(@NotNull JsonElement element) {
         return element.isJsonPrimitive() ? new TrackerData(
-                element.getAsString(),
-                ModelScaler.entity(),
-                null,
-                TrackerModifier.DEFAULT,
-                EntityBodyRotator.defaultData(),
-                null,
-                null
+            element.getAsString(),
+            ModelScaler.entity(),
+            null,
+            TrackerModifier.DEFAULT,
+            EntityBodyRotator.defaultData(),
+            null,
+            null
         ) : PARSER.fromJson(element, TrackerData.class);
     }
 
+    /**
+     * Returns the model scaler, or a default entity scaler if not specified.
+     *
+     * @return the model scaler
+     * @since 1.15.2
+     */
     @Override
     public @NotNull ModelScaler scaler() {
         return scaler != null ? scaler : ModelScaler.entity();
     }
 
+    /**
+     * Returns the model rotator, or a default YAW rotator if not specified.
+     *
+     * @return the model rotator
+     * @since 1.15.2
+     */
     @Override
     public @NotNull ModelRotator rotator() {
         return rotator != null ? rotator : ModelRotator.YAW;
     }
 
+    /**
+     * Returns the entity hide option, or the default hide option if not specified.
+     *
+     * @return the entity hide option
+     * @since 1.15.2
+     */
     @Override
     public @NotNull EntityHideOption hideOption() {
         return hideOption != null ? hideOption : EntityHideOption.DEFAULT;
     }
 
+    /**
+     * Returns the set of player UUIDs marked for spawning, or an empty set if not specified.
+     *
+     * @return the set of player UUIDs marked for spawning
+     * @since 1.15.2
+     */
     @Override
     public @NotNull Set<UUID> markForSpawn() {
         return markForSpawn != null ? markForSpawn : Collections.emptySet();
     }
 
+    /**
+     * Returns the body rotation data, or default body rotation data if not specified.
+     *
+     * @return the body rotation data
+     * @since 1.15.2
+     */
     @Override
     public @NotNull EntityBodyRotator.RotatorData bodyRotator() {
         return bodyRotator != null ? bodyRotator : EntityBodyRotator.defaultData();
     }
 
+    /**
+     * Serializes this TrackerData object to a JSON string.
+     *
+     * @return a JSON string representation of this object
+     * @since 1.15.2
+     */
     @NotNull
     @Override
     public String toString() {

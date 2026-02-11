@@ -6,75 +6,12 @@
  */
 package kr.toxicity.model.api.scheduler;
 
-import kr.toxicity.model.api.entity.BaseEntity;
-import org.bukkit.Location;
-import org.bukkit.entity.Entity;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * A scheduler of BetterModel
  */
 public interface ModelScheduler {
-
-    /**
-     * Runs entity sync task
-     * @param entity entity
-     * @param runnable task
-     * @return scheduled task
-     */
-    default @Nullable ModelTask task(@NotNull Entity entity, @NotNull Runnable runnable) {
-        return task(entity.getLocation(), runnable);
-    }
-
-    /**
-     * Runs entity sync task
-     * @param entity entity
-     * @param delay delay
-     * @param runnable task
-     * @return scheduled task
-     */
-    default @Nullable ModelTask taskLater(@NotNull Entity entity, long delay, @NotNull Runnable runnable) {
-        return taskLater(entity.getLocation(), delay, runnable);
-    }
-
-    /**
-     * Runs entity sync task
-     * @param entity entity
-     * @param runnable task
-     * @return scheduled task
-     */
-    default @Nullable ModelTask task(@NotNull BaseEntity entity, @NotNull Runnable runnable) {
-        return task(entity.location(), runnable);
-    }
-
-    /**
-     * Runs entity sync task
-     * @param entity entity
-     * @param delay delay
-     * @param runnable task
-     * @return scheduled task
-     */
-    default @Nullable ModelTask taskLater(@NotNull BaseEntity entity, long delay, @NotNull Runnable runnable) {
-        return taskLater(entity.location(), delay, runnable);
-    }
-
-    /**
-     * Runs entity sync task
-     * @param location location
-     * @param runnable task
-     * @return scheduled task
-     */
-    @Nullable ModelTask task(@NotNull Location location, @NotNull Runnable runnable);
-
-    /**
-     * Runs entity sync task
-     * @param location location
-     * @param delay delay
-     * @param runnable task
-     * @return scheduled task
-     */
-    @Nullable ModelTask taskLater(@NotNull Location location, long delay, @NotNull Runnable runnable);
 
     /**
      * Runs async task

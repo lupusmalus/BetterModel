@@ -14,14 +14,14 @@ import kr.toxicity.model.api.profile.ModelProfileSkin
 import kr.toxicity.model.api.profile.ModelProfileSupplier
 import kr.toxicity.model.profile.DefaultHttpModelProfileSupplier
 import kr.toxicity.model.profile.HttpModelProfileSupplier
-import kr.toxicity.model.util.PLUGIN
+import kr.toxicity.model.util.PLATFORM
 import java.net.URI
 import java.util.Base64
 
 object ProfileManagerImpl : ProfileManager, GlobalManager {
 
     private val gson = GsonBuilder().create()
-    private var supplier = if (PLUGIN.nms().isProxyOnlineMode) DefaultHttpModelProfileSupplier() else HttpModelProfileSupplier()
+    private lateinit var supplier: ModelProfileSupplier
 
     override fun supplier(): ModelProfileSupplier = supplier
 
@@ -60,6 +60,10 @@ object ProfileManagerImpl : ProfileManager, GlobalManager {
         val model: String
     ) {
         val slim get() = model == "slim"
+    }
+
+    override fun start() {
+        supplier = if (PLATFORM.nms().isProxyOnlineMode) DefaultHttpModelProfileSupplier() else HttpModelProfileSupplier()
     }
 
     override fun reload(pipeline: ReloadPipeline, zipper: PackZipper) {

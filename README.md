@@ -3,9 +3,9 @@
 ![](https://github.com/user-attachments/assets/89e191ba-ed4f-44ab-bb98-634cfe568dca)
 
 # BetterModel
-*- Modern Bedrock model engine for Bukkit -*
+*- Modern Bedrock model engine for Minecraft Java Edition -*
 
-[![](https://img.shields.io/maven-central/v/io.github.toxicity188/bettermodel?style=flat-square&logo=sonatype)](https://central.sonatype.com/artifact/io.github.toxicity188/bettermodel)
+[![](https://img.shields.io/maven-central/v/io.github.toxicity188/bettermodel-api?style=flat-square&logo=sonatype)](https://central.sonatype.com/artifact/io.github.toxicity188/bettermodel-api)
 [![](https://www.codefactor.io/repository/github/toxicity188/bettermodel/badge?style=flat-square)](https://www.codefactor.io/repository/github/toxicity188/bettermodel)
 [![](https://img.shields.io/github/actions/workflow/status/toxicity188/BetterModel/publish.yml?style=flat-square)](https://modrinth.com/plugin/bettermodel/versions)
 [![](https://img.shields.io/github/issues/toxicity188/BetterModel?style=flat-square&logo=github)](https://github.com/toxicity188/BetterModel/issues)
@@ -22,7 +22,7 @@
 
 # ✨ Introduction
 
-**BetterModel** is a plugin-based engine that provides runtime BlockBench model rendering & animating for Minecraft Java Edition.
+**BetterModel** is a server-based engine that provides runtime BlockBench model rendering & animating for Minecraft Java Edition.
 
 It implements **fully server-side 3D models** by using an item display entity packet.
 
@@ -57,7 +57,7 @@ BetterModel aims to be a reliable engine that provides stable, high-quality anim
 
 ## 🛠️ Build info
 
-[![](https://img.shields.io/badge/minecraft-1.20.5%7E1.21.11-8FCA5C)](https://www.minecraft.net/en-us/download/server)
+[![](https://img.shields.io/badge/minecraft-1.21%7E1.21.11-8FCA5C)](https://www.minecraft.net/en-us/download/server)
 [![](https://img.shields.io/badge/java-21%7E-ED8B00)](https://adoptium.net/)
 
 #### Build
@@ -80,14 +80,16 @@ BetterModel aims to be a reliable engine that provides stable, high-quality anim
 - [molang-compiler](https://github.com/Ocelot5836/molang-compiler): compiling and evaluating molang expression
 - [libby](https://github.com/AlessioDP/libby): runtime library downloader
 
-
-#### Tested Server Platform
+#### Tested Bukkit Server Platform
 - [Paper](https://papermc.io/downloads/paper)
 - [Purpur](https://purpurmc.org/download/purpur)
 - [Spigot](https://www.spigotmc.org/)
 - [Folia](https://papermc.io/downloads/folia)
 - [Leaf](https://www.leafmc.one/download)
 - [Canvas](https://canvasmc.io/downloads/canvas)
+
+#### Tested Mod Server Platform
+- [Fabric Loader](https://fabricmc.net/)
 
 ## 💻 API
 
@@ -103,10 +105,13 @@ BetterModel aims to be a reliable engine that provides stable, high-quality anim
 ```kotlin
 repositories {
     mavenCentral()
+    maven("https://maven.blamejared.com/") // For transitive dependency in bettermodel-fabric
+    maven("https://maven.nucleoid.xyz/") // For transitive dependency in bettermodel-fabric
 }
 
 dependencies {
-    compileOnly("io.github.toxicity188:bettermodel:VERSION")
+    compileOnly("io.github.toxicity188:bettermodel-bukkit-api:VERSION") // bukkit(spigot, paper, etc) api
+    //modApi("io.github.toxicity188:bettermodel-fabric:VERSION") // mod(fabric)
 }
 ```
 
@@ -119,10 +124,13 @@ repositories {
             password = YOUR_GITHUB_TOKEN
         }
     }
+    maven("https://maven.blamejared.com/") // For transitive dependency in bettermodel-fabric
+    maven("https://maven.nucleoid.xyz/") // For transitive dependency in bettermodel-fabric
 }
 
 dependencies {
-    compileOnly("io.github.toxicity188:bettermodel:VERSION-SNAPSHOT")
+    compileOnly("io.github.toxicity188:bettermodel-bukkit-api:VERSION-SNAPSHOT") // bukkit(spigot, paper, etc) api
+    //modApi("io.github.toxicity188:bettermodel-fabric:VERSION-SNAPSHOT") // mod(fabric)
 }
 ```
 </details>
@@ -134,10 +142,13 @@ dependencies {
 ```groovy
 repositories {
     mavenCentral()
+    maven 'https://maven.blamejared.com/' // For transitive dependency in bettermodel-fabric
+    maven 'https://maven.nucleoid.xyz/' // For transitive dependency in bettermodel-fabric
 }
 
 dependencies {
-    compileOnly 'io.github.toxicity188:bettermodel:VERSION'
+    compileOnly 'io.github.toxicity188:bettermodel-bukkit-api:VERSION' // bukkit(spigot, paper, etc) api
+    //modApi 'io.github.toxicity188:bettermodel-fabric:VERSION' // mod(fabric)
 }
 ```
 
@@ -151,10 +162,13 @@ repositories {
             password = YOUR_GITHUB_TOKEN
         }
     }
+    maven 'https://maven.blamejared.com/' // For transitive dependency in bettermodel-fabric
+    maven 'https://maven.nucleoid.xyz/' // For transitive dependency in bettermodel-fabric
 }
 
 dependencies {
-    compileOnly 'io.github.toxicity188:bettermodel:VERSION-SNAPSHOT'
+    compileOnly 'io.github.toxicity188:bettermodel-bukkit-api:VERSION-SNAPSHOT' // bukkit(spigot, paper, etc) api
+    //modApi 'io.github.toxicity188:bettermodel-fabric:VERSION-SNAPSHOT' // mod(fabric)
 }
 ```
 </details>
@@ -174,7 +188,7 @@ dependencies {
 <dependencies>
     <dependency>
         <groupId>io.github.toxicity188</groupId>
-        <artifactId>bettermodel</artifactId>
+        <artifactId>bettermodel-bukkit-api</artifactId>
         <version>VERSION</version>
         <scope>provided</scope>
     </dependency>
@@ -193,7 +207,13 @@ dependencies {
 <dependencies>
     <dependency>
         <groupId>io.github.toxicity188</groupId>
-        <artifactId>bettermodel</artifactId>
+        <artifactId>bettermodel-api</artifactId>
+        <version>VERSION-SNAPSHOT</version>
+        <scope>provided</scope>
+    </dependency>
+    <dependency>
+        <groupId>io.github.toxicity188</groupId>
+        <artifactId>bettermodel-bukkit-api</artifactId>
         <version>VERSION-SNAPSHOT</version>
         <scope>provided</scope>
     </dependency>
@@ -216,31 +236,31 @@ BetterModel.limbOrNull("steve"); //player model or null
 #### Creates model (entity)
 ```java
 EntityTracker tracker = BetterModel.model("demon_knight")
-    .map(r -> r.getOrCreate(entity)) //Gets or creates entity tracker by this renderer to some entity.
+    .map(r -> r.getOrCreate(BukkitAdapter.adapt(entity))) //Gets or creates entity tracker by this renderer to some entity.
     .orElse(null);
 ```
 ```java
 EntityTracker tracker = BetterModel.model("demon_knight")
-    .map(r -> r.create(entity, TrackerModifier.DEFAULT, t -> t.update(TrackerUpdateAction.tint(0x0026FF)))) //Creates entity tracker with pre-spawn task.
+    .map(r -> r.create(BukkitAdapter.adapt(entity), TrackerModifier.DEFAULT, t -> t.update(TrackerUpdateAction.tint(0x0026FF)))) //Creates entity tracker with pre-spawn task.
     .orElse(null);
 ```
 
 #### Creates model (dummy)
 ```java
 DummyTracker tracker = BetterModel.model("demon_knight")
-    .map(r -> r.create(location)) //Creates some dummy tracker to this location.
+    .map(r -> r.create(BukkitAdapter.adapt(location))) //Creates some dummy tracker to this location.
     .orElse(null);
 ```
 ```java
 DummyTracker tracker = BetterModel.limb("steve")
-    .map(r -> r.create(location, ModelProfile.of(player))) //Creates some dummy tracker to this location and player's skin profile.
+    .map(r -> r.create(BukkitAdapter.adapt(location), ModelProfile.of(BukkitAdapter.adapt(player)))) //Creates some dummy tracker to this location and player's skin profile.
     .orElse(null);
 ```
 
 #### Update some tracker's display data
 ```java
 BetterModel.model("demon_knight")
-    .map(r -> r.create(entity, TrackerModifier.DEFAULT, t -> {
+    .map(r -> r.create(BukkitAdapter.adapt(entity), TrackerModifier.DEFAULT, t -> {
         t.update(TrackerUpdateAction.tint(rgb)); //Tint
         t.update(TrackerUpdateAction.enchant(true), bone -> true); //Enchant with predicate
     }))

@@ -9,6 +9,7 @@ package kr.toxicity.model.test;
 import io.papermc.paper.event.entity.EntityPushedByEntityAttackEvent;
 import kr.toxicity.model.api.BetterModel;
 import kr.toxicity.model.api.animation.AnimationModifier;
+import kr.toxicity.model.api.bukkit.platform.BukkitAdapter;
 import kr.toxicity.model.api.tracker.ModelRotation;
 import kr.toxicity.model.api.tracker.TrackerModifier;
 import net.kyori.adventure.audience.Audience;
@@ -119,10 +120,10 @@ public final class RollTester implements ModelTester, Listener {
     private void playRoll(@NotNull Player player) {
         var input = inputToYaw(player);
         BetterModel.limb("steve")
-            .map(r -> r.getOrCreate(player, TrackerModifier.DEFAULT, t -> t.rotation(() -> new ModelRotation(player.getPitch(), packDegree(input + t.registry().entity().bodyYaw())))))
+            .map(r -> r.getOrCreate(BukkitAdapter.adapt(player), TrackerModifier.DEFAULT, t -> t.rotation(() -> new ModelRotation(player.getPitch(), packDegree(input + t.registry().entity().bodyYaw())))))
             .ifPresent(t -> {
                 if (t.animate(b -> true, "roll", AnimationModifier.DEFAULT_WITH_PLAY_ONCE, () -> {
-                    BetterModel.plugin().scheduler().asyncTaskLater(3, () -> coolTimeSet.remove(player.getUniqueId()));
+                    BetterModel.platform().scheduler().asyncTaskLater(3, () -> coolTimeSet.remove(player.getUniqueId()));
                     t.close();
                 })) {
                     if (coolTimeSet.add(player.getUniqueId()) && invulnerableSet.add(player.getUniqueId())) {
@@ -133,7 +134,7 @@ public final class RollTester implements ModelTester, Listener {
                             true,
                             false
                         ));
-                        BetterModel.plugin().scheduler().asyncTaskLater(8, () -> invulnerableSet.remove(player.getUniqueId()));
+                        BetterModel.platform().scheduler().asyncTaskLater(8, () -> invulnerableSet.remove(player.getUniqueId()));
                         player.setVelocity(player.getVelocity()
                             .add(new Vector(0, 0, 0.75).rotateAroundY(-Math.toRadians(input + t.registry().entity().bodyYaw())))
                             .setY(0.15));

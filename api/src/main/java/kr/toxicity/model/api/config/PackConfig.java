@@ -6,8 +6,9 @@
  */
 package kr.toxicity.model.api.config;
 
-import org.bukkit.configuration.ConfigurationSection;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.function.Predicate;
 
 /**
  * Pack config
@@ -16,9 +17,9 @@ import org.jetbrains.annotations.NotNull;
  * @param useObfuscation use obfuscation
  */
 public record PackConfig(
-        boolean generateModernModel,
-        boolean generateLegacyModel,
-        boolean useObfuscation
+    boolean generateModernModel,
+    boolean generateLegacyModel,
+    boolean useObfuscation
 ) {
     /**
      * Default config
@@ -27,14 +28,14 @@ public record PackConfig(
 
     /**
      * Creates config from YAML
-     * @param section yaml
+     * @param predicate predicate
      * @return config
      */
-    public static @NotNull PackConfig from(@NotNull ConfigurationSection section) {
+    public static @NotNull PackConfig from(@NotNull Predicate<String> predicate) {
         return new PackConfig(
-                section.getBoolean("generate-modern-model", true),
-                section.getBoolean("generate-legacy-model", true),
-                section.getBoolean("use-obfuscation", false)
+            predicate.test("generate-modern-model"),
+            predicate.test("generate-legacy-model"),
+            predicate.test("use-obfuscation")
         );
     }
 }

@@ -4,5 +4,5 @@ plugins {
 
 dependencies {
     compileOnly(project(":api"))
-    compileOnly(libs.bundles.shadedLibrary)
+    compileOnly(project(":api:bukkit-api"))
 }

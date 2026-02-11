@@ -7,12 +7,11 @@
 package kr.toxicity.model.api.manager;
 
 import lombok.Builder;
-import org.bukkit.Bukkit;
-import org.bukkit.command.CommandSender;
+import net.kyori.adventure.audience.Audience;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Represents the context for a plugin reload operation.
+ * Represents the context for a platform reload operation.
  * <p>
  * This record holds information about who initiated the reload and whether certain parts of the reload should be skipped.
  * </p>
@@ -22,13 +21,13 @@ import org.jetbrains.annotations.NotNull;
  * @since 1.15.2
  */
 @Builder
-public record ReloadInfo(boolean skipConfig, @NotNull CommandSender sender) {
+public record ReloadInfo(boolean skipConfig, @NotNull Audience sender) {
     /**
      * The default reload info, representing a standard reload initiated from the console.
      * @since 1.15.2
      */
     public static final ReloadInfo DEFAULT = ReloadInfo.builder()
         .skipConfig(false)
-        .sender(Bukkit.getConsoleSender())
+        .sender(Audience.empty())
         .build();
 }

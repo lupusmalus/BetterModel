@@ -1,17 +1,19 @@
 plugins {
     id("bukkit-conventions")
+    id("modrinth-conventions")
     id("com.gradleup.shadow")
-    id("com.modrinth.minotaur")
 }
 
-val shade = configurations.getByName("shade")
+val shade: Configuration = configurations.getByName("shade")
 val versionString = version.toString()
 val groupString = group.toString()
-val classifier = project.name
+val classifier: String = project.name
 
 dependencies {
     compileOnly(project(":api"))
-    shade(project(":core")) {
+    compileOnly(project(":api:bukkit-api"))
+    compileOnly(project(":core"))
+    shade(project(":core:bukkit-core")) {
         exclude("org.jetbrains.kotlin")
     }
 }
@@ -44,7 +46,6 @@ tasks {
         fun prefix(pattern: String) {
             relocate(pattern, "$groupString.shaded.$pattern")
         }
-        exclude("LICENSE")
         prefix("kotlin")
         prefix("kr.toxicity.library.sharedpackets")
         prefix("kr.toxicity.library.armormodel")
@@ -55,23 +56,7 @@ tasks {
 }
 
 modrinth {
-    token = System.getenv("MODRINTH_API_TOKEN")
-    projectId = "bettermodel"
-    syncBodyFrom = rootProject.file("BANNER.md").readText()
-    val log = System.getenv("COMMIT_MESSAGE")
-    if (log != null) {
-        versionType = "beta"
-        changelog = log
-    } else {
-        versionType = "release"
-        changelog = rootProject.file("changelog/$versionString.md").readText()
-    }
     uploadFile.set(tasks.shadowJar)
-    additionalFiles = listOf(
-        rootProject.layout.buildDirectory.file("libs/${rootProject.name}-$versionString-javadoc.jar")
-    )
-    versionName = "BetterModel $versionString for ${classifier.replaceFirstChar { it.uppercase() }}"
-    versionNumber = versionString
     gameVersions = SUPPORTED_VERSIONS
     dependencies {
         optional.project(

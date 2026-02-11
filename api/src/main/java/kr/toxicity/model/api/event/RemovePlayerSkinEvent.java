@@ -9,37 +9,29 @@ package kr.toxicity.model.api.event;
 import kr.toxicity.model.api.profile.ModelProfile;
 import lombok.Getter;
 import lombok.Setter;
-import org.bukkit.event.Cancellable;
-import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * Triggered when a player's skin data is about to be removed from the cache.
+ * <p>
+ * This event allows cancelling the removal to keep the skin data cached.
+ * </p>
+ *
+ * @since 2.0.0
+ */
 @Getter
 @Setter
-public final class RemovePlayerSkinEvent extends AbstractModelEvent implements Cancellable {
-    /**
-     * Handler list
-     */
-    public static final HandlerList HANDLER_LIST = new HandlerList();
-
+public final class RemovePlayerSkinEvent implements CancellableEvent {
     private final ModelProfile modelProfile;
     private boolean cancelled;
 
-    public RemovePlayerSkinEvent(@NotNull ModelProfile modelProfile) {
-        super(true);
-        this.modelProfile = modelProfile;
-    }
-
-    @Override
-    public @NotNull HandlerList getHandlers() {
-        return HANDLER_LIST;
-    }
-
     /**
-     * Gets a handler list
-     * @return handler list
+     * Creates a new RemovePlayerSkinEvent.
+     *
+     * @param modelProfile the model profile being removed
+     * @since 2.0.0
      */
-    @SuppressWarnings("unused") //This method is necessary for event API.
-    public static @NotNull HandlerList getHandlerList() {
-        return HANDLER_LIST;
+    public RemovePlayerSkinEvent(@NotNull ModelProfile modelProfile) {
+        this.modelProfile = modelProfile;
     }
 }

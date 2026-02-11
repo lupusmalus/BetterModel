@@ -9,37 +9,20 @@ package kr.toxicity.model.api.event;
 
 import kr.toxicity.model.api.data.blueprint.ModelBlueprint;
 import kr.toxicity.model.api.data.renderer.ModelRenderer;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Model imported event
+ * Triggered when a model is successfully imported and registered.
+ * <p>
+ * This event provides access to the raw blueprint and the created renderer.
+ * </p>
+ *
+ * @param blueprint the model blueprint
+ * @param renderer the model renderer
+ * @since 2.0.0
  */
-@RequiredArgsConstructor
-@Getter
-public final class ModelImportedEvent extends AbstractModelEvent {
-
-    /**
-     * Handler list
-     */
-    public static final HandlerList HANDLER_LIST = new HandlerList();
-
-    private final ModelBlueprint blueprint;
-    private final ModelRenderer renderer;
-
-    @Override
-    public @NotNull HandlerList getHandlers() {
-        return HANDLER_LIST;
-    }
-
-    /**
-     * Gets a handler list
-     * @return handler list
-     */
-    @SuppressWarnings("unused") //This method is necessary for event API.
-    public static @NotNull HandlerList getHandlerList() {
-        return HANDLER_LIST;
-    }
+public record ModelImportedEvent(
+    @NotNull ModelBlueprint blueprint,
+    @NotNull ModelRenderer renderer
+) implements ModelEvent {
 }

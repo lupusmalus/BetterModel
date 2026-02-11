@@ -17,7 +17,7 @@ import java.util.function.Supplier;
  * This record holds the file name and a supplier for the JSON content.
  * </p>
  *
- * @param name the name of the JSON file (including extension)
+ * @param name the name of the JSON file (without extension)
  * @param element a supplier that provides the JSON content
  * @since 1.15.2
  */
@@ -25,4 +25,24 @@ public record BlueprintJson(
     @NotNull String name,
     @NotNull Supplier<JsonElement> element
 ) {
+
+    /**
+     * Returns the name of the JSON file with a .json extension.
+     *
+     * @return the JSON file name
+     * @since 2.0.1
+     */
+    public @NotNull String jsonName() {
+        return name + ".json";
+    }
+
+    /**
+     * Builds and returns the JSON content by invoking the supplier.
+     *
+     * @since 2.0.1
+     * @return the generated JSON element
+     */
+    public @NotNull JsonElement buildJson() {
+        return element.get();
+    }
 }

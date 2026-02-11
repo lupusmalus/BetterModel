@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "kr.toxicity.model"
-version = property("plugin_version").toString() + (BUILD_NUMBER?.let { "-SNAPSHOT-$it" } ?: "")
+version = property("project_version").toString() + (BUILD_NUMBER?.let { "-SNAPSHOT-$it" } ?: "")
 
 val shade = configurations.create("shade")
 
@@ -14,14 +14,7 @@ configurations.implementation {
     extendsFrom(shade)
 }
 
-repositories {
-    mavenCentral()
-    maven("https://repo.papermc.io/repository/maven-public/")
-    maven("https://repo.codemc.org/repository/maven-public/")
-    maven("https://jitpack.io")
-    maven("https://repo.alessiodp.com/releases/")
-    maven("https://maven.blamejared.com/")
-}
+rootProject.dependencies.dokka(project)
 
 dependencies {
     testImplementation(kotlin("test"))
