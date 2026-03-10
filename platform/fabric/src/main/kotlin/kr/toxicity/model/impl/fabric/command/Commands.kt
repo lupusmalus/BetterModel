@@ -274,10 +274,15 @@ private fun play(context: CommandContext<AudiencePlayer>) {
     val animation = context.string("animation") { limb.animation(it).orElse(null) ?: return audience.warn("Unable to find this animation: $it") }
     val loopType = context.nullable("loop_type", AnimationIterator.Type.PLAY_ONCE)
     val hide = context.nullable<Boolean>("hide") != false
+    val isNewTracker = player.toRegistry()?.tracker(limb.name()) == null
     limb.getOrCreate(player.connection.wrap(), TrackerModifier.DEFAULT) {
         it.hideOption(if (hide) EntityHideOption.DEFAULT else EntityHideOption.FALSE)
     }.run {
-        if (!animate(animation, AnimationModifier(0, 0, loopType), ::close)) close()
+        if (isNewTracker) {
+            if (!animate(animation, AnimationModifier(0, 0, loopType), ::close)) close()
+        } else {
+            if (!animate(animation, AnimationModifier(0, 0, loopType))) close()
+        }
     }
 }
 
