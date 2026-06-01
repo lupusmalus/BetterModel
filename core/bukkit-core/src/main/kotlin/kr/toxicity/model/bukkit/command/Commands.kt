@@ -12,6 +12,8 @@ import kr.toxicity.model.api.BetterModelPlatform.ReloadResult.OnReload
 import kr.toxicity.model.api.BetterModelPlatform.ReloadResult.Success
 import kr.toxicity.model.api.animation.AnimationIterator
 import kr.toxicity.model.api.animation.AnimationModifier
+import kr.toxicity.model.api.entity.BaseEntity
+import kr.toxicity.model.api.entity.BasePlayer
 import kr.toxicity.model.api.tracker.EntityHideOption
 import kr.toxicity.model.api.tracker.ModelScaler
 import kr.toxicity.model.api.tracker.Tracker
@@ -45,6 +47,7 @@ import net.kyori.adventure.audience.Audience
 import net.kyori.adventure.text.format.NamedTextColor.GRAY
 import net.kyori.adventure.text.format.NamedTextColor.GREEN
 import net.kyori.adventure.text.format.NamedTextColor.YELLOW
+import org.bukkit.Location
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.Player
@@ -156,6 +159,7 @@ fun startBukkitCommand() {
                 )
                 .optional("loop_type", enumParser(AnimationIterator.Type::class.java))
                 .optional("hide", booleanParser())
+                .optional("location", locationParser())
                 .senderType(AudiencePlayer::class.java)
                 .handler(::play)
         }
@@ -303,6 +307,15 @@ private fun play(context: CommandContext<AudiencePlayer>) {
     val limb = context.limb("limb") { return audience.warn("Unable to find this limb: $it") }
     val animation = context.string("animation") { limb.animation(it).orElse(null) ?: return audience.warn("Unable to find this animation: $it") }
     val loopType = context.nullable("loop_type", AnimationIterator.Type.PLAY_ONCE)
+    val location = context.nullable<Location>("location")
+    if (location != null) {
+        val profile = (BaseEntity.of(player.wrap()) as BasePlayer).profile()
+        limb.create(location.wrap(), profile).run {
+            player.server.onlinePlayers.forEach { spawn(it.wrap()) }
+            if (!animate(animation, AnimationModifier(0, 0, loopType), ::close)) close()
+        }
+        return
+    }
     val hide = context.nullable<Boolean>("hide") != false
     val existingTracker = player.toRegistry()?.tracker(limb.name())
     val isDisguiseTracker = existingTracker != null && existingTracker !in playCreatedTrackers
