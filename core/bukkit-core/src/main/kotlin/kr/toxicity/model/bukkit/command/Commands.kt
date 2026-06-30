@@ -73,6 +73,7 @@ import java.util.IdentityHashMap
 private val MODEL_SUGGESTION = blockingStrings<Audience> { _, _ -> BetterModel.modelKeys() }
 private val LIMB_SUGGESTION = blockingStrings<Audience> { _, _ -> BetterModel.limbKeys() }
 private val playCreatedTrackers: MutableSet<Tracker> = Collections.synchronizedSet(Collections.newSetFromMap(IdentityHashMap()))
+private val playLocationTrackers: MutableSet<Tracker> = Collections.synchronizedSet(Collections.newSetFromMap(IdentityHashMap()))
 
 fun startBukkitCommand() {
     LegacyPaperCommandManager(
@@ -162,6 +163,16 @@ fun startBukkitCommand() {
                 .optional("location", locationParser())
                 .senderType(AudiencePlayer::class.java)
                 .handler(::play)
+        }
+        create(
+            "playstop",
+            "Removes location-based play limbs.",
+            "ps"
+        ) {
+            optional("limb", stringParser(), blockingStrings { _, _ ->
+                synchronized(playLocationTrackers) { playLocationTrackers.map(Tracker::name).toSet() }
+            })
+                .handler(::playStop)
         }
         create(
             "hide",
@@ -311,6 +322,8 @@ private fun play(context: CommandContext<AudiencePlayer>) {
     if (location != null) {
         val profile = (BaseEntity.of(player.wrap()) as BasePlayer).profile()
         limb.create(location.wrap(), profile).run {
+            playLocationTrackers.add(this)
+            handleCloseEvent { t, _ -> playLocationTrackers.remove(t) }
             player.server.onlinePlayers.forEach { spawn(it.wrap()) }
             if (!animate(animation, AnimationModifier(0, 0, loopType), ::close)) close()
         }
@@ -332,6 +345,17 @@ private fun play(context: CommandContext<AudiencePlayer>) {
             animate(animation, AnimationModifier(0, 0, loopType))
         }
     }
+}
+
+private fun playStop(context: CommandContext<Audience>) {
+    val audience = context.sender()
+    val filter = context.nullable<String>("limb")
+    val targets = synchronized(playLocationTrackers) {
+        playLocationTrackers.filter { filter == null || it.name() == filter }
+    }
+    if (targets.isEmpty()) return audience.warn("No location-based play limb to remove.")
+    targets.forEach(Tracker::close)
+    audience.info("Removed ${targets.size} location-based play limb(s).")
 }
 
 private fun test(context: CommandContext<Audience>) {
