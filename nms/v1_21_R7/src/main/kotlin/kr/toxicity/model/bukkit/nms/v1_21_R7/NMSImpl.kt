@@ -238,7 +238,6 @@ class NMSImpl : NMS {
                         stateId,
                         items.apply {
                             PLAYER_EQUIPMENT_SLOT.forEach { set(it, EMPTY_ITEM) }
-                            set(connection.player.hotbarSlot, EMPTY_ITEM)
                         },
                         carriedItem
                     )

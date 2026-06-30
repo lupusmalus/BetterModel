@@ -676,6 +676,14 @@ public final class EntityTrackerRegistry {
         private void spawn(@NotNull PacketBundler bundler) {
             reapplyHideOption();
             bundler.send(channelHandler.player(), () -> BetterModel.nms().hide(channelHandler, EntityTrackerRegistry.this, () -> viewedPlayerMap.containsKey(channelHandler.uuid())));
+            // Re-sync the disguised player's own inventory after the model settles, so the held hotbar item
+            // stays visible on (re)disguise. Mirrors the restore that close() performs on undisguise.
+            if (entity instanceof BasePlayer player && channelHandler.uuid().equals(entity.uuid())) {
+                var plugin = BetterModel.platform();
+                plugin.scheduler().asyncTaskLater(plugin.config().playerHideDelay() + 1, () -> {
+                    if (viewedPlayerMap.containsKey(channelHandler.uuid())) player.updateInventory();
+                });
+            }
         }
 
         private synchronized void reapplyHideOption() {

@@ -126,8 +126,7 @@ inline fun LivingEntity.toEquipmentPacket(mapper: (EquipmentSlot) -> ItemStack? 
 fun LivingEntity.toEmptyEquipmentPacket() = toEquipmentPacket { ItemStack.EMPTY }
 
 fun ClientboundContainerSetSlotPacket.isEquipment(player: Player): Boolean {
-    return containerId == 0 &&
-        (PLAYER_EQUIPMENT_SLOT.contains(slot) || slot == player.hotbarSlot)
+    return containerId == 0 && PLAYER_EQUIPMENT_SLOT.contains(slot)
 }
 
 fun eachEquipmentSlots(block: (Int) -> Unit) {

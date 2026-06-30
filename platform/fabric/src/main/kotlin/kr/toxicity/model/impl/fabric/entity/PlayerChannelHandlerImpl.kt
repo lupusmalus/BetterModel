@@ -176,7 +176,6 @@ class PlayerChannelHandlerImpl(
                     stateId,
                     items.apply {
                         eachEquipmentSlots { set(it, ItemStack.EMPTY) }
-                        set(connection.player.hotbarSlot, ItemStack.EMPTY)
                     },
                     carriedItem
                 )
