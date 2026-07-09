@@ -51,6 +51,7 @@ bukkitPluginYaml {
             "undisguise" to true,
             "test" to true,
             "play" to true,
+            "playcamera" to true,
             "playstop" to true,
             "version" to true,
             "hide" to true,

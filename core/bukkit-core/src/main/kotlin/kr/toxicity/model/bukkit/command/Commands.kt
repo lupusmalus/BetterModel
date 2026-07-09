@@ -12,12 +12,15 @@ import kr.toxicity.model.api.BetterModelPlatform.ReloadResult.OnReload
 import kr.toxicity.model.api.BetterModelPlatform.ReloadResult.Success
 import kr.toxicity.model.api.animation.AnimationIterator
 import kr.toxicity.model.api.animation.AnimationModifier
+import kr.toxicity.model.api.bone.BoneTags
 import kr.toxicity.model.api.entity.BaseEntity
 import kr.toxicity.model.api.entity.BasePlayer
 import kr.toxicity.model.api.tracker.EntityHideOption
 import kr.toxicity.model.api.tracker.ModelScaler
 import kr.toxicity.model.api.tracker.Tracker
 import kr.toxicity.model.api.tracker.TrackerModifier
+import kr.toxicity.model.api.tracker.TrackerUpdateAction
+import kr.toxicity.model.api.util.function.BonePredicate
 import kr.toxicity.model.bukkit.audience.AudiencePlayer
 import kr.toxicity.model.bukkit.audience.AudienceSender
 import kr.toxicity.model.bukkit.audience.BukkitAudience
@@ -161,12 +164,29 @@ fun startBukkitCommand() {
                 .optional("loop_type", enumParser(AnimationIterator.Type::class.java))
                 .optional("hide", booleanParser())
                 .optional("location", locationParser())
+                .optional("equipment", booleanParser())
                 .senderType(AudiencePlayer::class.java)
                 .handler(::play)
         }
         create(
+            "playcamera",
+            "Plays a player animation on your spectator camera target.",
+            "pc"
+        ) {
+            required("limb", stringParser(), LIMB_SUGGESTION)
+                .required(
+                    "animation",
+                    stringParser(),
+                    blockingStrings { ctx, _ -> ctx.nullableString("limb") { BetterModel.limbOrNull(it)?.animations()?.keys } ?: emptySet()  }
+                )
+                .optional("loop_type", enumParser(AnimationIterator.Type::class.java))
+                .optional("equipment", booleanParser())
+                .senderType(AudiencePlayer::class.java)
+                .handler(::playCamera)
+        }
+        create(
             "playstop",
-            "Removes location-based play limbs.",
+            "Removes detached play limbs (location or camera).",
             "ps"
         ) {
             optional("limb", stringParser(), blockingStrings { _, _ ->
@@ -312,6 +332,15 @@ private fun reload(context: CommandContext<Audience>) {
     }
 }
 
+private fun Tracker.mirrorEquipment(source: BaseEntity) {
+    PLATFORM.scheduler().asyncTaskLater(2L) {
+        if (isClosed) return@asyncTaskLater
+        update(TrackerUpdateAction.itemStack(source.mainHand()), BonePredicate.from { it.name().tagged(BoneTags.RIGHT_ITEM) })
+        update(TrackerUpdateAction.itemStack(source.offHand()), BonePredicate.from { it.name().tagged(BoneTags.LEFT_ITEM) })
+        update(TrackerUpdateAction.itemStack(source.helmet().withScale(0.5f)), BonePredicate.from { it.name().tagged(BoneTags.HEAD_ITEM) })
+    }
+}
+
 private fun play(context: CommandContext<AudiencePlayer>) {
     val audience = context.sender()
     val player = audience.sender
@@ -320,11 +349,13 @@ private fun play(context: CommandContext<AudiencePlayer>) {
     val loopType = context.nullable("loop_type", AnimationIterator.Type.PLAY_ONCE)
     val location = context.nullable<Location>("location")
     if (location != null) {
-        val profile = (BaseEntity.of(player.wrap()) as BasePlayer).profile()
+        val base = BaseEntity.of(player.wrap())
+        val profile = (base as BasePlayer).profile()
         limb.create(location.wrap(), profile).run {
             playLocationTrackers.add(this)
             handleCloseEvent { t, _ -> playLocationTrackers.remove(t) }
             player.server.onlinePlayers.forEach { spawn(it.wrap()) }
+            if (context.nullable<Boolean>("equipment") == true) mirrorEquipment(base)
             if (!animate(animation, AnimationModifier(0, 0, loopType), ::close)) close()
         }
         return
@@ -347,15 +378,32 @@ private fun play(context: CommandContext<AudiencePlayer>) {
     }
 }
 
+private fun playCamera(context: CommandContext<AudiencePlayer>) {
+    val audience = context.sender()
+    val player = audience.sender
+    val limb = context.limb("limb") { return audience.warn("Unable to find this limb: $it") }
+    val animation = context.string("animation") { limb.animation(it).orElse(null) ?: return audience.warn("Unable to find this animation: $it") }
+    val loopType = context.nullable("loop_type", AnimationIterator.Type.PLAY_ONCE)
+    val target = player.spectatorTarget ?: return audience.warn("You must be spectating an entity to use this.")
+    val base = BaseEntity.of(player.wrap())
+    val profile = (base as BasePlayer).profile()
+    limb.getOrCreate(target.wrap(), profile, TrackerModifier.DEFAULT).run {
+        playLocationTrackers.add(this)
+        handleCloseEvent { t, _ -> playLocationTrackers.remove(t) }
+        if (context.nullable<Boolean>("equipment") == true) mirrorEquipment(base)
+        if (!animate(animation, AnimationModifier(0, 0, loopType), ::close)) close()
+    }
+}
+
 private fun playStop(context: CommandContext<Audience>) {
     val audience = context.sender()
     val filter = context.nullable<String>("limb")
     val targets = synchronized(playLocationTrackers) {
         playLocationTrackers.filter { filter == null || it.name() == filter }
     }
-    if (targets.isEmpty()) return audience.warn("No location-based play limb to remove.")
+    if (targets.isEmpty()) return audience.warn("No detached play limb to remove.")
     targets.forEach(Tracker::close)
-    audience.info("Removed ${targets.size} location-based play limb(s).")
+    audience.info("Removed ${targets.size} detached play limb(s).")
 }
 
 private fun test(context: CommandContext<Audience>) {
