@@ -185,6 +185,23 @@ fun startBukkitCommand() {
                 .handler(::playCamera)
         }
         create(
+            "playentity",
+            "Plays a player animation following a selected entity.",
+            "pe"
+        ) {
+            required("limb", stringParser(), LIMB_SUGGESTION)
+                .required(
+                    "animation",
+                    stringParser(),
+                    blockingStrings { ctx, _ -> ctx.nullableString("limb") { BetterModel.limbOrNull(it)?.animations()?.keys } ?: emptySet()  }
+                )
+                .required("entity", multipleEntitySelectorParser())
+                .optional("loop_type", enumParser(AnimationIterator.Type::class.java))
+                .optional("equipment", booleanParser())
+                .senderType(AudiencePlayer::class.java)
+                .handler(::playEntity)
+        }
+        create(
             "playstop",
             "Removes detached play limbs (location or camera).",
             "ps"
@@ -193,6 +210,20 @@ fun startBukkitCommand() {
                 synchronized(playLocationTrackers) { playLocationTrackers.map(Tracker::name).toSet() }
             })
                 .handler(::playStop)
+        }
+        create(
+            "stop",
+            "Stops a played animation on a model (returns to idle, keeps the model).",
+            "st"
+        ) {
+            required("limb", stringParser(), LIMB_SUGGESTION)
+                .optional(
+                    "animation",
+                    stringParser(),
+                    blockingStrings { ctx, _ -> ctx.nullableString("limb") { BetterModel.limbOrNull(it)?.animations()?.keys } ?: emptySet()  }
+                )
+                .senderType(AudiencePlayer::class.java)
+                .handler(::stop)
         }
         create(
             "hide",
@@ -393,6 +424,38 @@ private fun playCamera(context: CommandContext<AudiencePlayer>) {
         if (context.nullable<Boolean>("equipment") == true) mirrorEquipment(base)
         if (!animate(animation, AnimationModifier(0, 0, loopType), ::close)) close()
     }
+}
+
+private fun playEntity(context: CommandContext<AudiencePlayer>) {
+    val audience = context.sender()
+    val player = audience.sender
+    val limb = context.limb("limb") { return audience.warn("Unable to find this limb: $it") }
+    val animation = context.string("animation") { limb.animation(it).orElse(null) ?: return audience.warn("Unable to find this animation: $it") }
+    val target = context.get<MultipleEntitySelector>("entity").values().firstOrNull() ?: return audience.warn("No entity matched.")
+    val loopType = context.nullable("loop_type", AnimationIterator.Type.PLAY_ONCE)
+    val base = BaseEntity.of(player.wrap())
+    val profile = (base as BasePlayer).profile()
+    limb.getOrCreate(target.wrap(), profile, TrackerModifier.DEFAULT).run {
+        playLocationTrackers.add(this)
+        handleCloseEvent { t, _ -> playLocationTrackers.remove(t) }
+        if (context.nullable<Boolean>("equipment") == true) mirrorEquipment(base)
+        if (!animate(animation, AnimationModifier(0, 0, loopType), ::close)) close()
+    }
+}
+
+private fun stop(context: CommandContext<AudiencePlayer>) {
+    val audience = context.sender()
+    val player = audience.sender
+    val limb = context.limb("limb") { return audience.warn("Unable to find this limb: $it") }
+    val animation = context.nullable<String>("animation")
+    val targets = buildList<Tracker> {
+        player.toTracker(limb.name())?.let { add(it) }
+        synchronized(playLocationTrackers) { playLocationTrackers.filterTo(this) { it.name() == limb.name() } }
+    }
+    if (targets.isEmpty()) return audience.warn("No active '${limb.name()}' model to stop.")
+    val animations = animation?.let { listOf(it) } ?: limb.animations().keys.toList()
+    val stopped = targets.count { tracker -> animations.any { tracker.stopAnimation(it) } }
+    audience.info("Stopped animation on $stopped '${limb.name()}' model(s).")
 }
 
 private fun playStop(context: CommandContext<Audience>) {

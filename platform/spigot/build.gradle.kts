@@ -52,7 +52,9 @@ bukkitPluginYaml {
             "test" to true,
             "play" to true,
             "playcamera" to true,
+            "playentity" to true,
             "playstop" to true,
+            "stop" to true,
             "version" to true,
             "hide" to true,
             "show" to true
