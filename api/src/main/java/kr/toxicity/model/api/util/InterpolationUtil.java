@@ -57,6 +57,12 @@ public final class InterpolationUtil {
         var sp = interpolatorFor(scale);
         var rp = interpolatorFor(rotation);
         var keyframe = AnimationKeyframe.builder(points.size(), rotationGlobal);
+        // Quantize absolute times and delta them so per-segment floor errors
+        // telescope away: the summed frame count of every animation lands on
+        // exactly roundTime(length). Flooring each delta independently (the old
+        // behavior) lost up to a frame per off-grid keyframe, so animations of
+        // equal authored length looped at different effective periods and
+        // drifted out of sync with each other.
         var before = 0F;
         var iterator = points.iterator();
         while (iterator.hasNext()) {
@@ -64,14 +70,15 @@ public final class InterpolationUtil {
             var pr = pp.build(f);
             var sr = sp.build(f);
             var rr = rp.build(f);
+            var rounded = roundTime(f);
             keyframe.write(
-                roundTime(f - before),
+                rounded - before,
                 pr.vector,
                 sr.vector,
                 rr.vector,
                 pr.skipInterpolation || sr.skipInterpolation || rr.skipInterpolation
             );
-            before = f;
+            before = rounded;
         }
         return keyframe.build();
     }
