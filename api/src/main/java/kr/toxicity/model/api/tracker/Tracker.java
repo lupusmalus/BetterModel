@@ -192,6 +192,14 @@ public abstract class Tracker implements AutoCloseable {
                 TrackerBuiltInAnimation.play(this);
             }
             updater.run();
+            // Align every tracker to one global 25ms grid: the initial delay lands
+            // the first tick on the next epoch grid boundary and frame is seeded
+            // from epoch time so parity is global too. Otherwise each tracker's
+            // grid is phased by its own spawn time, and animations started on two
+            // trackers in the same server tick begin up to a frame apart --
+            // a visible constant offset between models meant to move in sync.
+            var now = System.currentTimeMillis();
+            frame = now / TRACKER_TICK_INTERVAL;
             task = EXECUTOR.scheduleAtFixedRate(() -> {
                 if (playerCount() == 0 && !forRemoval.get()) {
                     shutdown();
@@ -199,7 +207,7 @@ public abstract class Tracker implements AutoCloseable {
                 }
                 frame++;
                 updater.run();
-            }, TRACKER_TICK_INTERVAL, TRACKER_TICK_INTERVAL, TimeUnit.MILLISECONDS);
+            }, TRACKER_TICK_INTERVAL - now % TRACKER_TICK_INTERVAL, TRACKER_TICK_INTERVAL, TimeUnit.MILLISECONDS);
             LogUtil.debug(DebugConfig.DebugOption.TRACKER, () -> getClass().getSimpleName() + " scheduler started: " + name());
         }
     }
