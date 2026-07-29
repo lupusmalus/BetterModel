@@ -13,9 +13,14 @@ import kr.toxicity.model.api.BetterModelPlatform.ReloadResult.Success
 import kr.toxicity.model.api.animation.AnimationIterator
 import kr.toxicity.model.api.animation.AnimationModifier
 import kr.toxicity.model.api.bone.BoneTags
+import kr.toxicity.model.api.data.blueprint.BlueprintAnimation
+import kr.toxicity.model.api.data.renderer.ModelRenderer
 import kr.toxicity.model.api.entity.BaseEntity
 import kr.toxicity.model.api.entity.BasePlayer
+import kr.toxicity.model.api.profile.ModelProfile
+import kr.toxicity.model.api.profile.ModelProfileInfo
 import kr.toxicity.model.api.tracker.EntityHideOption
+import kr.toxicity.model.api.tracker.EntityTracker
 import kr.toxicity.model.api.tracker.ModelScaler
 import kr.toxicity.model.api.tracker.Tracker
 import kr.toxicity.model.api.tracker.TrackerModifier
@@ -50,6 +55,7 @@ import net.kyori.adventure.audience.Audience
 import net.kyori.adventure.text.format.NamedTextColor.GRAY
 import net.kyori.adventure.text.format.NamedTextColor.GREEN
 import net.kyori.adventure.text.format.NamedTextColor.YELLOW
+import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.EntityType
@@ -198,8 +204,19 @@ fun startBukkitCommand() {
                 .required("entity", multipleEntitySelectorParser())
                 .optional("loop_type", enumParser(AnimationIterator.Type::class.java))
                 .optional("equipment", booleanParser())
+                .optional("skin", stringParser())
+                .optional("viewers", multipleEntitySelectorParser())
                 .senderType(AudiencePlayer::class.java)
                 .handler(::playEntity)
+        }
+        create(
+            "stopentity",
+            "Detaches a played model from an entity.",
+            "se"
+        ) {
+            required("entity", multipleEntitySelectorParser())
+                .optional("limb", stringParser(), LIMB_SUGGESTION)
+                .handler(::stopEntity)
         }
         create(
             "playstop",
@@ -432,15 +449,64 @@ private fun playEntity(context: CommandContext<AudiencePlayer>) {
     val limb = context.limb("limb") { return audience.warn("Unable to find this limb: $it") }
     val animation = context.string("animation") { limb.animation(it).orElse(null) ?: return audience.warn("Unable to find this animation: $it") }
     val target = context.get<MultipleEntitySelector>("entity").values().firstOrNull() ?: return audience.warn("No entity matched.")
-    val loopType = context.nullable("loop_type", AnimationIterator.Type.PLAY_ONCE)
-    val base = BaseEntity.of(player.wrap())
-    val profile = (base as BasePlayer).profile()
-    limb.getOrCreate(target.wrap(), profile, TrackerModifier.DEFAULT).run {
-        playLocationTrackers.add(this)
-        handleCloseEvent { t, _ -> playLocationTrackers.remove(t) }
-        if (context.nullable<Boolean>("equipment") == true) mirrorEquipment(base)
-        if (!animate(animation, AnimationModifier(0, 0, loopType), ::close)) close()
+    val loopType = context.nullable<AnimationIterator.Type>("loop_type") // null = use the animation's authored loop type
+    val equipment = context.nullable<Boolean>("equipment") == true
+    val skin = context.nullable<String>("skin")
+    val viewers = context.nullable<MultipleEntitySelector>("viewers")?.values()?.filterIsInstance<Player>()?.takeIf { it.isNotEmpty() }
+
+    if (viewers != null) {
+        // Per-viewer: one keyed copy per viewer, visible only to them, wearing their own skin/equipment.
+        viewers.forEach { viewer ->
+            val viewerBase = BaseEntity.of(viewer.wrap())
+            val key = "${limb.name()}#${viewer.uniqueId}"
+            val tracker = limb.getOrCreate(target.wrap(), key, (viewerBase as BasePlayer).profile().asUncompleted(), TrackerModifier.DEFAULT) { t ->
+                t.markPlayerForSpawn(viewer.wrap())
+                playLocationTrackers.add(t)
+                t.handleCloseEvent { c, _ -> playLocationTrackers.remove(c) }
+            }
+            applyBody(tracker, limb, animation, loopType, if (equipment) viewerBase else null)
+        }
+    } else {
+        // Single body visible to everyone, wearing the caster's skin (or an explicit skin).
+        val casterBase = BaseEntity.of(player.wrap())
+        val appearance = skin?.let(::resolveAppearance) ?: (casterBase to (casterBase as BasePlayer).profile().asUncompleted())
+        val tracker = limb.getOrCreate(target.wrap(), limb.name(), appearance.second, TrackerModifier.DEFAULT) { t ->
+            playLocationTrackers.add(t)
+            t.handleCloseEvent { c, _ -> playLocationTrackers.remove(c) }
+        }
+        applyBody(tracker, limb, animation, loopType, if (equipment) appearance.first else null)
     }
+}
+
+// Applies (or switches) the animation on an already-attached body without ever closing it.
+// stopAnimation clears the previous animation without firing its remove-task; no remove-task is
+// passed to animate, so the model persists until bm stopentity/playstop removes it.
+private fun applyBody(tracker: EntityTracker, limb: ModelRenderer, animation: BlueprintAnimation, loopType: AnimationIterator.Type?, equipmentSource: BaseEntity?) {
+    limb.animations().keys.forEach { tracker.stopAnimation(it) }
+    if (equipmentSource != null) tracker.mirrorEquipment(equipmentSource)
+    tracker.animate(animation, AnimationModifier(0, 0, loopType))
+}
+
+// Resolves an explicit skin (online name, offline name, or base64 texture blob) to a profile,
+// plus a live entity to mirror equipment from when the skin is an online player.
+private fun resolveAppearance(skin: String): Pair<BaseEntity?, ModelProfile.Uncompleted> {
+    if (skin.length > 16) return null to ModelProfile.of(ModelProfileInfo.UNKNOWN, BetterModel.platform().profileManager().skin(skin)).asUncompleted()
+    Bukkit.getPlayerExact(skin)?.let {
+        val base = BaseEntity.of(it.wrap())
+        return base to (base as BasePlayer).profile().asUncompleted()
+    }
+    return null to ModelProfile.of(Bukkit.getOfflinePlayer(skin).wrap())
+}
+
+private fun stopEntity(context: CommandContext<Audience>) {
+    val audience = context.sender()
+    val target = context.get<MultipleEntitySelector>("entity").values().firstOrNull() ?: return audience.warn("No entity matched.")
+    val limbName = context.nullable<String>("limb")
+    val registry = target.toRegistry() ?: return audience.warn("No model on that entity.")
+    val toClose = registry.trackers().filter { limbName == null || it.name() == limbName }
+    if (toClose.isEmpty()) return audience.warn("No matching model on that entity.")
+    toClose.forEach(EntityTracker::close)
+    audience.info("Detached ${toClose.size} model(s).")
 }
 
 private fun stop(context: CommandContext<AudiencePlayer>) {

@@ -88,6 +88,7 @@ paperPluginYaml {
             "playcamera" to true,
             "playentity" to true,
             "playstop" to true,
+            "stopentity" to true,
             "stop" to true,
             "version" to true,
             "hide" to true,

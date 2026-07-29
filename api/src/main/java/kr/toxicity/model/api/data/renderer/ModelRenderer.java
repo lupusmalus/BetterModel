@@ -379,6 +379,26 @@ public record ModelRenderer(
     }
 
     /**
+     * Gets or creates a tracker on an entity under an explicit registry key.
+     * <p>
+     * The registry normally keys trackers by model name, so a second create of the same model on one
+     * entity closes the first. Passing a distinct key lets multiple independent copies of the same
+     * model coexist on a single entity (e.g. one per viewer). The resulting tracker's
+     * {@link EntityTracker#name()} still reports the model name, so name-based lookups keep working.
+     *
+     * @param entity            entity
+     * @param key               unique registry key per copy
+     * @param profile           profile
+     * @param modifier          modifier
+     * @param preUpdateConsumer task on pre-update (runs before the tracker is spawned to viewers)
+     * @return entity tracker
+     */
+    public @NotNull EntityTracker getOrCreate(@NotNull PlatformEntity entity, @NotNull String key, @NotNull ModelProfile.Uncompleted profile, @NotNull TrackerModifier modifier, @NotNull Consumer<EntityTracker> preUpdateConsumer) {
+        var source = RenderSource.of(BaseEntity.of(entity), profile);
+        return source.getOrCreate(key, () -> pipeline(source), modifier, preUpdateConsumer);
+    }
+
+    /**
      * Creates tracker by entity
      *
      * @param entity entity
