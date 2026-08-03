@@ -13,6 +13,7 @@ import kr.toxicity.model.api.nms.NMS;
 import kr.toxicity.model.api.pack.PackResult;
 import kr.toxicity.model.api.pack.PackZipper;
 import kr.toxicity.model.api.platform.PlatformAdapter;
+import kr.toxicity.model.api.platform.PlatformPlayer;
 import kr.toxicity.model.api.scheduler.ModelScheduler;
 import kr.toxicity.model.api.version.MinecraftVersion;
 import lombok.RequiredArgsConstructor;
@@ -143,6 +144,29 @@ public interface BetterModelPlatform extends ModelEventApplication {
      * @since 1.15.2
      */
     @NotNull ScriptManager scriptManager();
+
+    /**
+     * Spawns a vanilla particle for a single player at a world position.
+     * <p>
+     * Used to render particle keyframes authored in Blockbench. The client can only render vanilla
+     * particles, so an unknown particle name is skipped (with a one-time warning). The default
+     * implementation is a no-op for platforms that do not support particle rendering.
+     * </p>
+     *
+     * @param player   the player to show the particle to
+     * @param particle the vanilla particle name (namespace optional, e.g. {@code flame} or {@code minecraft:flame})
+     * @param x        world x
+     * @param y        world y
+     * @param z        world z
+     * @param count    particle count
+     * @param offsetX  spread on x
+     * @param offsetY  spread on y
+     * @param offsetZ  spread on z
+     * @param speed    particle speed/extra
+     * @since 2.2.1
+     */
+    default void spawnParticle(@NotNull PlatformPlayer player, @NotNull String particle, double x, double y, double z, int count, double offsetX, double offsetY, double offsetZ, double speed) {
+    }
 
     /**
      * Returns the skin manager.

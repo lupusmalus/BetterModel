@@ -27,7 +27,9 @@ import java.util.Objects;
  * @param x the x-coordinate value or script
  * @param y the y-coordinate value or script
  * @param z the z-coordinate value or script
- * @param script the script string (used for sound/particle effects)
+ * @param script the script string (used for timeline scripts, or particle parameters in this fork)
+ * @param effect the effect id (particle/sound keyframes) — for particles, the vanilla particle name
+ * @param locator the locator/bone this effect emits from (particle keyframes), may be null
  * @since 1.15.2
  */
 @ApiStatus.Internal
@@ -35,8 +37,20 @@ public record ModelDatapoint(
     @Nullable JsonPrimitive x,
     @Nullable JsonPrimitive y,
     @Nullable JsonPrimitive z,
-    @Nullable String script
+    @Nullable String script,
+    @Nullable String effect,
+    @Nullable String locator
 ) {
+
+    /**
+     * Checks if this data point carries an effect id (particle/sound keyframe).
+     *
+     * @return true if an effect id is present
+     * @since 2.2.1
+     */
+    public boolean hasEffect() {
+        return effect != null;
+    }
 
     /**
      * Checks if this data point contains a script.

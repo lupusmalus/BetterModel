@@ -72,6 +72,17 @@ object ScriptManagerImpl : ScriptManager, GlobalManager {
                 it.metadata.asString("map")
             )
         }
+        addBuilder("particle") {
+            ParticleScript(
+                it.metadata.asString("effect") ?: return@addBuilder AnimationScript.EMPTY,
+                it.metadata.asString("locator"),
+                it.metadata.asNumber("count")?.toInt() ?: 1,
+                it.metadata.asNumber("dx")?.toDouble() ?: 0.0,
+                it.metadata.asNumber("dy")?.toDouble() ?: 0.0,
+                it.metadata.asNumber("dz")?.toDouble() ?: 0.0,
+                it.metadata.asNumber("speed")?.toDouble() ?: 0.0
+            )
+        }
     }
 
     override fun build(script: String): AnimationScript? = script.toScript()

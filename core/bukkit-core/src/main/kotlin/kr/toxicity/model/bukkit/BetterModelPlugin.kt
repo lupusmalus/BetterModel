@@ -17,6 +17,7 @@ import kr.toxicity.model.api.bukkit.scheduler.BukkitModelScheduler
 import kr.toxicity.model.api.manager.*
 import kr.toxicity.model.api.nms.NMS
 import kr.toxicity.model.api.pack.PackZipper
+import kr.toxicity.model.api.platform.PlatformPlayer
 import kr.toxicity.model.api.version.MinecraftVersion
 import kr.toxicity.model.bukkit.command.startBukkitCommand
 import kr.toxicity.model.bukkit.configuration.PluginConfiguration
@@ -24,11 +25,13 @@ import kr.toxicity.model.bukkit.manager.PlayerManagerImpl
 import kr.toxicity.model.bukkit.util.ADVENTURE_PLATFORM
 import kr.toxicity.model.bukkit.util.audience
 import kr.toxicity.model.bukkit.util.registerListener
+import kr.toxicity.model.bukkit.util.unwarp
 import kr.toxicity.model.manager.*
 import kr.toxicity.model.util.*
 import net.kyori.adventure.audience.Audience
 import net.kyori.adventure.text.format.NamedTextColor.*
 import org.bukkit.Bukkit
+import org.bukkit.Particle
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
@@ -169,6 +172,22 @@ abstract class BetterModelPlugin : AbstractBetterModelPlugin() {
     override fun scriptManager(): ScriptManager = ScriptManagerImpl
     override fun skinManager(): SkinManager = SkinManagerImpl
     override fun profileManager(): ProfileManager = ProfileManagerImpl
+
+    private val particleCache = java.util.concurrent.ConcurrentHashMap<String, Particle>()
+    private val warnedParticles = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    override fun spawnParticle(player: PlatformPlayer, particle: String, x: Double, y: Double, z: Double, count: Int, offsetX: Double, offsetY: Double, offsetZ: Double, speed: Double) {
+        val bukkit = resolveParticle(particle) ?: return
+        player.unwarp().spawnParticle(bukkit, x, y, z, count, offsetX, offsetY, offsetZ, speed)
+    }
+
+    private fun resolveParticle(name: String): Particle? {
+        particleCache[name]?.let { return it }
+        val resolved = runCatching { Particle.valueOf(name.substringAfter(':').uppercase()) }.getOrNull()
+        if (resolved != null) particleCache[name] = resolved
+        else if (warnedParticles.add(name)) warn("Unknown particle '$name' in a model animation — skipped (the client only renders vanilla particles).".toComponent(RED))
+        return resolved
+    }
 
     override fun config(): BetterModelConfig = props.config
     override fun version(): MinecraftVersion = props.version

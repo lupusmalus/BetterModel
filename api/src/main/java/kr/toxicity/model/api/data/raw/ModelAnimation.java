@@ -90,12 +90,16 @@ public record ModelAnimation(
 
     private @Nullable BlueprintScript toScript(@NotNull ModelAnimator animator, @NotNull ModelPlaceholder placeholder) {
         var get = animator.stream()
-            .filter(f -> f.point().hasScript())
-            .map(d -> AnimationScript.of(Arrays.stream(placeholder.parseVariable(d.point().script()).split("\n"))
-                .map(BetterModel.platform().scriptManager()::build)
-                .filter(Objects::nonNull)
-                .toList()
-            ).time(d.time()))
+            .map(f -> {
+                var lines = effectLines(f, placeholder);
+                if (lines.isEmpty()) return null;
+                return AnimationScript.of(lines.stream()
+                    .map(BetterModel.platform().scriptManager()::build)
+                    .filter(Objects::nonNull)
+                    .toList()
+                ).time(f.time());
+            })
+            .filter(Objects::nonNull)
             .toList();
         if (get.isEmpty()) return null;
         var list = new ArrayList<TimeScript>(get.size() + 2);
@@ -114,6 +118,30 @@ public record ModelAnimation(
             length(),
             list
         );
+    }
+
+    private @NotNull List<String> effectLines(@NotNull ModelKeyframe keyframe, @NotNull ModelPlaceholder placeholder) {
+        var point = keyframe.point();
+        if (keyframe.channel() == KeyframeChannel.PARTICLE && point.hasEffect()) {
+            return List.of(toParticleScript(point));
+        }
+        if (point.hasScript()) {
+            return Arrays.asList(placeholder.parseVariable(point.script()).split("\n"));
+        }
+        return List.of();
+    }
+
+    // Synthesizes a `particle{...}` script line from a Blockbench particle keyframe so it flows through the
+    // normal effect-script timeline. Count/offset/speed come from `key=value;` pairs in the keyframe's script
+    // field (this fork's convention); non-parameter script text is ignored to keep model loading safe.
+    private @NotNull String toParticleScript(@NotNull ModelDatapoint point) {
+        var sb = new StringBuilder("particle{effect=").append(point.effect());
+        if (point.locator() != null) sb.append(";locator=").append(point.locator());
+        var params = point.script();
+        if (params != null && !params.isBlank() && Arrays.stream(params.split(";")).allMatch(s -> s.contains("="))) {
+            sb.append(';').append(params.trim());
+        }
+        return sb.append('}').toString();
     }
 
     /**
