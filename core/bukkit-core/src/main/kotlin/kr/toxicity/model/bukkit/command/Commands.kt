@@ -13,6 +13,7 @@ import kr.toxicity.model.api.BetterModelPlatform.ReloadResult.Success
 import kr.toxicity.model.api.animation.AnimationIterator
 import kr.toxicity.model.api.animation.AnimationModifier
 import kr.toxicity.model.api.bone.BoneTags
+import kr.toxicity.model.api.config.DebugConfig
 import kr.toxicity.model.api.data.blueprint.BlueprintAnimation
 import kr.toxicity.model.api.data.renderer.ModelRenderer
 import kr.toxicity.model.api.entity.BaseEntity
@@ -25,6 +26,7 @@ import kr.toxicity.model.api.tracker.ModelScaler
 import kr.toxicity.model.api.tracker.Tracker
 import kr.toxicity.model.api.tracker.TrackerModifier
 import kr.toxicity.model.api.tracker.TrackerUpdateAction
+import kr.toxicity.model.api.util.LogUtil
 import kr.toxicity.model.api.util.function.BonePredicate
 import kr.toxicity.model.bukkit.audience.AudiencePlayer
 import kr.toxicity.model.bukkit.audience.AudienceSender
@@ -78,6 +80,7 @@ import org.incendo.cloud.parser.standard.StringParser.stringParser
 import org.incendo.cloud.suggestion.SuggestionProvider.blockingStrings
 import java.util.Collections
 import java.util.IdentityHashMap
+import java.util.function.Supplier
 
 private val MODEL_SUGGESTION = blockingStrings<Audience> { _, _ -> BetterModel.modelKeys() }
 private val LIMB_SUGGESTION = blockingStrings<Audience> { _, _ -> BetterModel.limbKeys() }
@@ -206,7 +209,6 @@ fun startBukkitCommand() {
                 .optional("equipment", booleanParser())
                 .optional("skin", stringParser())
                 .optional("viewers", multipleEntitySelectorParser())
-                .senderType(AudiencePlayer::class.java)
                 .handler(::playEntity)
         }
         create(
@@ -443,9 +445,9 @@ private fun playCamera(context: CommandContext<AudiencePlayer>) {
     }
 }
 
-private fun playEntity(context: CommandContext<AudiencePlayer>) {
+private fun playEntity(context: CommandContext<Audience>) {
     val audience = context.sender()
-    val player = audience.sender
+    val player = (audience as? AudiencePlayer)?.sender
     val limb = context.limb("limb") { return audience.warn("Unable to find this limb: $it") }
     val animation = context.string("animation") { limb.animation(it).orElse(null) ?: return audience.warn("Unable to find this animation: $it") }
     val target = context.get<MultipleEntitySelector>("entity").values().firstOrNull() ?: return audience.warn("No entity matched.")
@@ -459,17 +461,29 @@ private fun playEntity(context: CommandContext<AudiencePlayer>) {
         viewers.forEach { viewer ->
             val viewerBase = BaseEntity.of(viewer.wrap())
             val key = "${limb.name()}#${viewer.uniqueId}"
+            val platformViewer = viewer.wrap()
             val tracker = limb.getOrCreate(target.wrap(), key, (viewerBase as BasePlayer).profile().asUncompleted(), TrackerModifier.DEFAULT) { t ->
-                t.markPlayerForSpawn(viewer.wrap())
+                t.markPlayerForSpawn(platformViewer)
                 playLocationTrackers.add(t)
                 t.handleCloseEvent { c, _ -> playLocationTrackers.remove(c) }
             }
+            // The registry only pushes copies to viewers it already registered (refreshSpawn) or to
+            // clients that newly receive the base entity (the AddEntity interceptor). A viewer of a
+            // stand whose add packet already went out before the registry existed is on neither
+            // path, so deliver explicitly; spawnIfNotSpawned is idempotent.
+            val delivered = tracker.registry().spawnIfNotSpawned(platformViewer)
+            LogUtil.debug(DebugConfig.DebugOption.TRACKER, Supplier {
+                "playentity $key for ${viewer.name}: canBeSpawnedAt=${tracker.canBeSpawnedAt(platformViewer)} delivered=$delivered"
+            })
             applyBody(tracker, limb, animation, loopType, if (equipment) viewerBase else null)
         }
     } else {
         // Single body visible to everyone, wearing the caster's skin (or an explicit skin).
-        val casterBase = BaseEntity.of(player.wrap())
-        val appearance = skin?.let(::resolveAppearance) ?: (casterBase to (casterBase as BasePlayer).profile().asUncompleted())
+        // A non-player sender has no skin of its own.
+        val casterBase = player?.let { BaseEntity.of(it.wrap()) }
+        val appearance = skin?.let(::resolveAppearance)
+            ?: casterBase?.let { it to (it as BasePlayer).profile().asUncompleted() }
+            ?: return audience.warn("A non-player sender must give a skin or viewers.")
         val tracker = limb.getOrCreate(target.wrap(), limb.name(), appearance.second, TrackerModifier.DEFAULT) { t ->
             playLocationTrackers.add(t)
             t.handleCloseEvent { c, _ -> playLocationTrackers.remove(c) }
