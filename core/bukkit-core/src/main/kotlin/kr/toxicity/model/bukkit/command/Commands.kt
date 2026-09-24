@@ -79,6 +79,7 @@ import org.incendo.cloud.parser.standard.BooleanParser.booleanParser
 import org.incendo.cloud.parser.standard.DoubleParser.doubleParser
 import org.incendo.cloud.parser.standard.EnumParser.enumParser
 import org.incendo.cloud.parser.standard.StringParser.stringParser
+import org.incendo.cloud.parser.standard.StringParser.quotedStringParser
 import org.incendo.cloud.suggestion.SuggestionProvider.blockingStrings
 import java.util.Collections
 import java.util.IdentityHashMap
@@ -175,7 +176,7 @@ fun startBukkitCommand() {
                 .optional("loop_type", enumParser(AnimationIterator.Type::class.java))
                 .optional("hide", booleanParser())
                 .optional("location", locationParser())
-                .optional("equipment", stringParser())
+                .optional("equipment", quotedStringParser())
                 .senderType(AudiencePlayer::class.java)
                 .handler(::play)
         }
@@ -191,7 +192,7 @@ fun startBukkitCommand() {
                     blockingStrings { ctx, _ -> ctx.nullableString("limb") { BetterModel.limbOrNull(it)?.animations()?.keys } ?: emptySet()  }
                 )
                 .optional("loop_type", enumParser(AnimationIterator.Type::class.java))
-                .optional("equipment", stringParser())
+                .optional("equipment", quotedStringParser())
                 .senderType(AudiencePlayer::class.java)
                 .handler(::playCamera)
         }
@@ -208,7 +209,7 @@ fun startBukkitCommand() {
                 )
                 .required("entity", multipleEntitySelectorParser())
                 .optional("loop_type", enumParser(AnimationIterator.Type::class.java))
-                .optional("equipment", stringParser())
+                .optional("equipment", quotedStringParser())
                 .optional("skin", stringParser())
                 .optional("viewers", multipleEntitySelectorParser())
                 .handler(::playEntity)
@@ -393,7 +394,8 @@ private sealed interface SlotSource {
 
 // The `equipment` argument: true mirrors every slot, false/absent leaves the bones alone,
 // otherwise "main:<v>|off:<v>|head:<v>" with <v> = mirror | none | <item id with components>.
-// Unlisted slots mirror.
+// Unlisted slots mirror. The per-slot form has colons, so it must be a quoted argument
+// (Brigadier words allow only [0-9A-Za-z_.+-]); use single quotes inside the item components.
 private class EquipmentSpec(val main: SlotSource, val off: SlotSource, val head: SlotSource) {
     companion object {
         private val MIRROR = EquipmentSpec(SlotSource.Mirror, SlotSource.Mirror, SlotSource.Mirror)
