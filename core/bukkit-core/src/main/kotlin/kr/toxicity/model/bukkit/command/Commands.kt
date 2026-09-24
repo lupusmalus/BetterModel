@@ -27,6 +27,7 @@ import kr.toxicity.model.api.tracker.Tracker
 import kr.toxicity.model.api.tracker.TrackerModifier
 import kr.toxicity.model.api.tracker.TrackerUpdateAction
 import kr.toxicity.model.api.util.LogUtil
+import kr.toxicity.model.api.util.TransformedItemStack
 import kr.toxicity.model.api.util.function.BonePredicate
 import kr.toxicity.model.bukkit.audience.AudiencePlayer
 import kr.toxicity.model.bukkit.audience.AudienceSender
@@ -62,6 +63,7 @@ import org.bukkit.Location
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.Player
+import org.bukkit.inventory.ItemStack
 import org.bukkit.util.Vector
 import org.incendo.cloud.SenderMapper
 import org.incendo.cloud.bukkit.BukkitCommandMeta
@@ -173,7 +175,7 @@ fun startBukkitCommand() {
                 .optional("loop_type", enumParser(AnimationIterator.Type::class.java))
                 .optional("hide", booleanParser())
                 .optional("location", locationParser())
-                .optional("equipment", booleanParser())
+                .optional("equipment", stringParser())
                 .senderType(AudiencePlayer::class.java)
                 .handler(::play)
         }
@@ -189,7 +191,7 @@ fun startBukkitCommand() {
                     blockingStrings { ctx, _ -> ctx.nullableString("limb") { BetterModel.limbOrNull(it)?.animations()?.keys } ?: emptySet()  }
                 )
                 .optional("loop_type", enumParser(AnimationIterator.Type::class.java))
-                .optional("equipment", booleanParser())
+                .optional("equipment", stringParser())
                 .senderType(AudiencePlayer::class.java)
                 .handler(::playCamera)
         }
@@ -206,7 +208,7 @@ fun startBukkitCommand() {
                 )
                 .required("entity", multipleEntitySelectorParser())
                 .optional("loop_type", enumParser(AnimationIterator.Type::class.java))
-                .optional("equipment", booleanParser())
+                .optional("equipment", stringParser())
                 .optional("skin", stringParser())
                 .optional("viewers", multipleEntitySelectorParser())
                 .handler(::playEntity)
@@ -382,14 +384,67 @@ private fun reload(context: CommandContext<Audience>) {
     }
 }
 
-private fun Tracker.mirrorEquipment(source: BaseEntity) {
-    PLATFORM.scheduler().asyncTaskLater(2L) {
-        if (isClosed) return@asyncTaskLater
-        update(TrackerUpdateAction.itemStack(source.mainHand()), BonePredicate.from { it.name().tagged(BoneTags.RIGHT_ITEM) })
-        update(TrackerUpdateAction.itemStack(source.offHand()), BonePredicate.from { it.name().tagged(BoneTags.LEFT_ITEM) })
-        update(TrackerUpdateAction.itemStack(source.helmet().withScale(0.5f)), BonePredicate.from { it.name().tagged(BoneTags.HEAD_ITEM) })
+// What a played body wears on one item bone: the source entity's item, nothing, or an explicit item.
+private sealed interface SlotSource {
+    data object Mirror : SlotSource
+    data object None : SlotSource
+    class Item(val stack: ItemStack) : SlotSource
+}
+
+// The `equipment` argument: true mirrors every slot, false/absent leaves the bones alone,
+// otherwise "main:<v>|off:<v>|head:<v>" with <v> = mirror | none | <item id with components>.
+// Unlisted slots mirror.
+private class EquipmentSpec(val main: SlotSource, val off: SlotSource, val head: SlotSource) {
+    companion object {
+        private val MIRROR = EquipmentSpec(SlotSource.Mirror, SlotSource.Mirror, SlotSource.Mirror)
+
+        fun parse(raw: String?): Result<EquipmentSpec?> = runCatching {
+            when (raw?.lowercase()) {
+                null, "false" -> null
+                "true" -> MIRROR
+                else -> {
+                    var main: SlotSource = SlotSource.Mirror
+                    var off: SlotSource = SlotSource.Mirror
+                    var head: SlotSource = SlotSource.Mirror
+                    raw.split('|').forEach { part ->
+                        val idx = part.indexOf(':')
+                        require(idx > 0) { "Equipment slot '$part' is not <slot>:<value>." }
+                        val value = part.substring(idx + 1)
+                        val source = when (value.lowercase()) {
+                            "mirror" -> SlotSource.Mirror
+                            "none" -> SlotSource.None
+                            else -> SlotSource.Item(Bukkit.getItemFactory().createItemStack(value))
+                        }
+                        when (val slot = part.substring(0, idx).lowercase()) {
+                            "main" -> main = source
+                            "off" -> off = source
+                            "head" -> head = source
+                            else -> error("Unknown equipment slot '$slot' (main, off, head).")
+                        }
+                    }
+                    EquipmentSpec(main, off, head)
+                }
+            }
+        }
     }
 }
+
+private fun Tracker.applyEquipment(spec: EquipmentSpec, source: BaseEntity?) {
+    PLATFORM.scheduler().asyncTaskLater(2L) {
+        if (isClosed) return@asyncTaskLater
+        fun resolve(slot: SlotSource, scale: Float, mirror: (BaseEntity) -> TransformedItemStack): TransformedItemStack = when (slot) {
+            SlotSource.Mirror -> source?.let(mirror) ?: TransformedItemStack.empty()
+            SlotSource.None -> TransformedItemStack.empty()
+            is SlotSource.Item -> TransformedItemStack.of(slot.stack.wrap()).withScale(scale)
+        }
+        update(TrackerUpdateAction.itemStack(resolve(spec.main, 1F) { it.mainHand() }), BonePredicate.from { it.name().tagged(BoneTags.RIGHT_ITEM) })
+        update(TrackerUpdateAction.itemStack(resolve(spec.off, 1F) { it.offHand() }), BonePredicate.from { it.name().tagged(BoneTags.LEFT_ITEM) })
+        update(TrackerUpdateAction.itemStack(resolve(spec.head, 0.5F) { it.helmet().withScale(0.5f) }), BonePredicate.from { it.name().tagged(BoneTags.HEAD_ITEM) })
+    }
+}
+
+private inline fun CommandContext<*>.equipmentSpec(onError: (String) -> Nothing): EquipmentSpec? =
+    EquipmentSpec.parse(nullable<String>("equipment")).getOrElse { onError(it.message ?: "Bad equipment argument.") }
 
 private fun play(context: CommandContext<AudiencePlayer>) {
     val audience = context.sender()
@@ -398,6 +453,7 @@ private fun play(context: CommandContext<AudiencePlayer>) {
     val animation = context.string("animation") { limb.animation(it).orElse(null) ?: return audience.warn("Unable to find this animation: $it") }
     val loopType = context.nullable("loop_type", AnimationIterator.Type.PLAY_ONCE)
     val location = context.nullable<Location>("location")
+    val equipment = context.equipmentSpec { return audience.warn(it) }
     if (location != null) {
         val base = BaseEntity.of(player.wrap())
         val profile = (base as BasePlayer).profile()
@@ -405,7 +461,7 @@ private fun play(context: CommandContext<AudiencePlayer>) {
             playLocationTrackers.add(this)
             handleCloseEvent { t, _ -> playLocationTrackers.remove(t) }
             player.server.onlinePlayers.forEach { spawn(it.wrap()) }
-            if (context.nullable<Boolean>("equipment") == true) mirrorEquipment(base)
+            equipment?.let { applyEquipment(it, base) }
             if (!animate(animation, AnimationModifier(0, 0, loopType), ::close)) close()
         }
         return
@@ -435,12 +491,13 @@ private fun playCamera(context: CommandContext<AudiencePlayer>) {
     val animation = context.string("animation") { limb.animation(it).orElse(null) ?: return audience.warn("Unable to find this animation: $it") }
     val loopType = context.nullable("loop_type", AnimationIterator.Type.PLAY_ONCE)
     val target = player.spectatorTarget ?: return audience.warn("You must be spectating an entity to use this.")
+    val equipment = context.equipmentSpec { return audience.warn(it) }
     val base = BaseEntity.of(player.wrap())
     val profile = (base as BasePlayer).profile()
     limb.getOrCreate(target.wrap(), profile, TrackerModifier.DEFAULT).run {
         playLocationTrackers.add(this)
         handleCloseEvent { t, _ -> playLocationTrackers.remove(t) }
-        if (context.nullable<Boolean>("equipment") == true) mirrorEquipment(base)
+        equipment?.let { applyEquipment(it, base) }
         if (!animate(animation, AnimationModifier(0, 0, loopType), ::close)) close()
     }
 }
@@ -452,7 +509,7 @@ private fun playEntity(context: CommandContext<Audience>) {
     val animation = context.string("animation") { limb.animation(it).orElse(null) ?: return audience.warn("Unable to find this animation: $it") }
     val target = context.get<MultipleEntitySelector>("entity").values().firstOrNull() ?: return audience.warn("No entity matched.")
     val loopType = context.nullable<AnimationIterator.Type>("loop_type") // null = use the animation's authored loop type
-    val equipment = context.nullable<Boolean>("equipment") == true
+    val equipment = context.equipmentSpec { return audience.warn(it) }
     val skin = context.nullable<String>("skin")
     val viewers = context.nullable<MultipleEntitySelector>("viewers")?.values()?.filterIsInstance<Player>()?.takeIf { it.isNotEmpty() }
 
@@ -475,7 +532,7 @@ private fun playEntity(context: CommandContext<Audience>) {
             LogUtil.debug(DebugConfig.DebugOption.TRACKER, Supplier {
                 "playentity $key for ${viewer.name}: canBeSpawnedAt=${tracker.canBeSpawnedAt(platformViewer)} delivered=$delivered"
             })
-            applyBody(tracker, limb, animation, loopType, if (equipment) viewerBase else null)
+            applyBody(tracker, limb, animation, loopType, equipment, viewerBase)
         }
     } else {
         // Single body visible to everyone, wearing the caster's skin (or an explicit skin).
@@ -488,16 +545,16 @@ private fun playEntity(context: CommandContext<Audience>) {
             playLocationTrackers.add(t)
             t.handleCloseEvent { c, _ -> playLocationTrackers.remove(c) }
         }
-        applyBody(tracker, limb, animation, loopType, if (equipment) appearance.first else null)
+        applyBody(tracker, limb, animation, loopType, equipment, appearance.first)
     }
 }
 
 // Applies (or switches) the animation on an already-attached body without ever closing it.
 // stopAnimation clears the previous animation without firing its remove-task; no remove-task is
 // passed to animate, so the model persists until bm stopentity/playstop removes it.
-private fun applyBody(tracker: EntityTracker, limb: ModelRenderer, animation: BlueprintAnimation, loopType: AnimationIterator.Type?, equipmentSource: BaseEntity?) {
+private fun applyBody(tracker: EntityTracker, limb: ModelRenderer, animation: BlueprintAnimation, loopType: AnimationIterator.Type?, equipment: EquipmentSpec?, equipmentSource: BaseEntity?) {
     limb.animations().keys.forEach { tracker.stopAnimation(it) }
-    if (equipmentSource != null) tracker.mirrorEquipment(equipmentSource)
+    equipment?.let { tracker.applyEquipment(it, equipmentSource) }
     tracker.animate(animation, AnimationModifier(0, 0, loopType))
 }
 
