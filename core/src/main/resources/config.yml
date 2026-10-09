@@ -99,6 +99,9 @@ player-hide-delay: 3
 # Higher values can reduce network overhead but may increase perceived latency. 0 to disable.
 packet-bundling-size: 16
 
+# Scale of an item shown on a head-item bone (the helmet slot). 0.5 is upstream's correction.
+head-item-scale: 0.5
+
 # Enables strict loading mode. If true, the plugin will fail to load models with unsupported features.
 # If false, it will attempt to load them by ignoring unsupported parts, which may cause visual issues.
 enable-strict-loading: false

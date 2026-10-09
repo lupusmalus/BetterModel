@@ -213,6 +213,15 @@ public interface BetterModelConfig {
     int packetBundlingSize();
 
     /**
+     * Returns the scale applied to an item shown on a head-item bone (helmet slot).
+     *
+     * @return the head item scale
+     */
+    default float headItemScale() {
+        return 0.5F;
+    }
+
+    /**
      * Checks if strict loading mode is enabled.
      * <p>
      * Strict loading causes the platform to fail fast on model loading errors.

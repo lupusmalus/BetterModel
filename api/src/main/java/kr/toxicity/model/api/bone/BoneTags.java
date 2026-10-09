@@ -75,14 +75,14 @@ public enum BoneTags implements BoneTag {
     /**
      * Entity's helmet item
      * <p>
-     * A built-in scale correction of {@code 0.5} is applied because
-     * {@link PlatformItemTransform#HEAD} renders items at 2× the scale
-     * relative to the animation bone coordinate system.
+     * Scaled by {@link kr.toxicity.model.api.BetterModelConfig#headItemScale()}
+     * (default {@code 0.5}) because {@link PlatformItemTransform#HEAD} renders
+     * items at 2× the scale relative to the animation bone coordinate system.
      * </p>
      */
     HEAD_ITEM(BoneItemMapper.entity(
         PlatformItemTransform.HEAD,
-        entity -> entity.helmet().withScale(0.5f)
+        entity -> entity.helmet().withScale(BetterModel.config().headItemScale())
     ), "phi"),
     /**
      * Player head

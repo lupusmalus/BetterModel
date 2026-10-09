@@ -441,7 +441,8 @@ private fun Tracker.applyEquipment(spec: EquipmentSpec, source: BaseEntity?) {
         }
         update(TrackerUpdateAction.itemStack(resolve(spec.main, 1F) { it.mainHand() }), BonePredicate.from { it.name().tagged(BoneTags.RIGHT_ITEM) })
         update(TrackerUpdateAction.itemStack(resolve(spec.off, 1F) { it.offHand() }), BonePredicate.from { it.name().tagged(BoneTags.LEFT_ITEM) })
-        update(TrackerUpdateAction.itemStack(resolve(spec.head, 0.5F) { it.helmet().withScale(0.5f) }), BonePredicate.from { it.name().tagged(BoneTags.HEAD_ITEM) })
+        val headScale = BetterModel.config().headItemScale()
+        update(TrackerUpdateAction.itemStack(resolve(spec.head, headScale) { it.helmet().withScale(headScale) }), BonePredicate.from { it.name().tagged(BoneTags.HEAD_ITEM) })
     }
 }
 
